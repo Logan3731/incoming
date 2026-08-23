@@ -4,3 +4,6 @@
 # 지난 버전은 git 태그로 남긴다 (예지: v2~v11 · 수신 중: incoming-v5~)
 /foresight_v*.html
 /incoming_v*.html
+
+# 브라우저 테스트 부산물
+.playwright-mcp/
