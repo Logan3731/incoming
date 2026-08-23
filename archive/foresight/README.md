@@ -4,7 +4,7 @@
 
 > 이 게임은 2026-08-21에 기각되어 `archive/`로 옮겨졌습니다. 경위는 [archive/README.md](../README.md)에 있습니다.
 
-**▶ [바로 해보기](https://logan3731.github.io/foresight/archive/foresight/)** — 브라우저에서 바로 실행, 설치·가입 없음, 폰에서도 됩니다.
+**▶ [바로 해보기](https://logan3731.github.io/incoming/archive/foresight/)** — 브라우저에서 바로 실행, 설치·가입 없음, 폰에서도 됩니다.
 
 ---
 
@@ -35,7 +35,7 @@
 | [`의사결정기록.md`](의사결정기록.md) | 무엇을 왜 정했고, 무엇을 포기했는지 |
 | [`개발일지.md`](개발일지.md) | 작업하며 남긴 기록 |
 
-파일은 이게 전부입니다. **지난 버전은 [태그](https://github.com/Logan3731/foresight/tags)로 남아 있습니다** — `v2`부터 `v10`까지, 각 태그에서 그 시점의 `index.html`을 받아 브라우저로 열면 그대로 플레이됩니다. 단일 HTML 파일이라 빌드가 필요 없습니다.
+파일은 이게 전부입니다. **지난 버전은 [태그](https://github.com/Logan3731/incoming/tags)로 남아 있습니다** — `v2`부터 `v10`까지, 각 태그에서 그 시점의 `index.html`을 받아 브라우저로 열면 그대로 플레이됩니다. 단일 HTML 파일이라 빌드가 필요 없습니다.
 
 ```bash
 git show v3:index.html > v3.html   # 특정 버전 꺼내기

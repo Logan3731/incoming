@@ -1,0 +1,60 @@
+- generic [ref=f2e2]:
+  - generic [ref=f2e3]:
+    - generic [ref=f2e4]: L
+    - generic [ref=f2e5]:
+      - text: logan
+      - generic [ref=f2e6]: 혼자 만듭니다
+    - generic [ref=f2e7]:
+      - button "한국어" [ref=f2e8] [cursor=pointer]
+      - button "EN" [ref=f2e9] [cursor=pointer]
+  - heading "만든 게임들" [level=1] [ref=f2e10]
+  - paragraph [ref=f2e11]: 브라우저에서 바로 되는 작은 게임들입니다. 설치도 가입도 없고, 폰에서도 됩니다.
+  - generic [ref=f2e12]:
+    - link "연쇄 게임 화면 — 칩 30 × 배수 2 × 연쇄 1 과 손패 카드들 연쇄 카드 로그라이트 포커 족보로 점수를 내는데, 규칙이 하나 다릅니다. 직전에 낸 패보다 칩이 높아야 배수가 쌓이고, 낮으면 처음으로 돌아갑니다. 그래서 좋은 패를 아무 때나 낼 수 없습니다. 점수 = 칩 × 배수 × 연쇄 한 판 10~15분 매일 새 문제 순위표 바로 하기 →" [ref=f2e13] [cursor=pointer]:
+      - /url: /first-game/
+      - img "연쇄 게임 화면 — 칩 30 × 배수 2 × 연쇄 1 과 손패 카드들" [ref=f2e14]
+      - generic [ref=f2e15]:
+        - generic [ref=f2e16]:
+          - generic [ref=f2e17]: 연쇄
+          - generic [ref=f2e18]: 카드 로그라이트
+        - paragraph [ref=f2e19]: 포커 족보로 점수를 내는데, 규칙이 하나 다릅니다. 직전에 낸 패보다 칩이 높아야 배수가 쌓이고, 낮으면 처음으로 돌아갑니다. 그래서 좋은 패를 아무 때나 낼 수 없습니다.
+        - generic [ref=f2e20]: 점수 = 칩 × 배수 × 연쇄
+        - generic [ref=f2e21]:
+          - generic [ref=f2e22]: 한 판 10~15분
+          - generic [ref=f2e23]: 매일 새 문제
+          - generic [ref=f2e24]: 순위표
+        - generic [ref=f2e25]: 바로 하기 →
+    - link "증언 게임 화면 — 용의자 다섯 명의 진술 목록 증언 추리 용의자 중 범인 한 명을 찾습니다. 증언 가운데 몇 개가 거짓인지만 알려주고, 누가 거짓말을 했는지는 알려주지 않습니다. 거짓의 개수만 알려준다. 누구인지는 직접 좁혀야 한다 사건 12개 연속 기회 3번 제한시간 바로 하기 →" [ref=f2e26] [cursor=pointer]:
+      - /url: /testimony/
+      - img "증언 게임 화면 — 용의자 다섯 명의 진술 목록" [ref=f2e27]
+      - generic [ref=f2e28]:
+        - generic [ref=f2e29]:
+          - generic [ref=f2e30]: 증언
+          - generic [ref=f2e31]: 추리
+        - paragraph [ref=f2e32]: 용의자 중 범인 한 명을 찾습니다. 증언 가운데 몇 개가 거짓인지만 알려주고, 누가 거짓말을 했는지는 알려주지 않습니다.
+        - generic [ref=f2e33]: 거짓의 개수만 알려준다. 누구인지는 직접 좁혀야 한다
+        - generic [ref=f2e34]:
+          - generic [ref=f2e35]: 사건 12개 연속
+          - generic [ref=f2e36]: 기회 3번
+          - generic [ref=f2e37]: 제한시간
+        - generic [ref=f2e38]: 바로 하기 →
+    - link "수신 중 게임 화면 — 현장 시점으로 전환된 3층 복도와 301호 문 수신 중 119 상황실 · 이야기 119 상황실 야간 근무. 전화는 목소리뿐이고, 질문 하나에 시간이 갑니다. 매뉴얼은 \"목소리만 듣고 장난이라 단정하지 말라\"고 하는데 펌프차는 한 대뿐입니다. 출동시키면 보낸 사람의 시점으로 현장에 들어갑니다. 개발 중 — 지금은 밤 1과 밤 2의 도입부까지. 보낼 것인가. 틀린 통화는 밤이 끝난 뒤 다시 들려준다 밤 1 · 30~40분 실제 119 절차 고증 개발 중 바로 하기 →" [ref=f2e39] [cursor=pointer]:
+      - /url: /foresight/
+      - img "수신 중 게임 화면 — 현장 시점으로 전환된 3층 복도와 301호 문" [ref=f2e40]
+      - generic [ref=f2e41]:
+        - generic [ref=f2e42]:
+          - generic [ref=f2e43]: 수신 중
+          - generic [ref=f2e44]: 119 상황실 · 이야기
+        - paragraph [ref=f2e45]: 119 상황실 야간 근무. 전화는 목소리뿐이고, 질문 하나에 시간이 갑니다. 매뉴얼은 "목소리만 듣고 장난이라 단정하지 말라"고 하는데 펌프차는 한 대뿐입니다. 출동시키면 보낸 사람의 시점으로 현장에 들어갑니다. 개발 중 — 지금은 밤 1과 밤 2의 도입부까지.
+        - generic [ref=f2e46]: 보낼 것인가. 틀린 통화는 밤이 끝난 뒤 다시 들려준다
+        - generic [ref=f2e47]:
+          - generic [ref=f2e48]: 밤 1 · 30~40분
+          - generic [ref=f2e49]: 실제 119 절차 고증
+          - generic [ref=f2e50]: 개발 중
+        - generic [ref=f2e51]: 바로 하기 →
+  - contentinfo [ref=f2e52]:
+    - paragraph [ref=f2e53]: 새 게임 소식과 피드백은 인스타로 받고 있어요.
+    - link "◎ @logan_devvv" [ref=f2e54] [cursor=pointer]:
+      - /url: https://www.instagram.com/logan_devvv/
+      - generic [ref=f2e55]: ◎
+      - text: "@logan_devvv"

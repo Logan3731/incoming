@@ -22,7 +22,7 @@
 
 그런데 v4~v10의 피드백이 **전부 난이도 얘기**였습니다. "이 순간이 재밌다"가 한 번도 안 나왔습니다. v11에서 화재 현장으로 리스킨한 뒤 결론 — *"이 게임 방식이 별로 재미없는 것 같아. 애초에 하면서 큰 흥미가 없었어."* **밸런스 얘기만 남으면 코어가 재미없다는 신호**라는 걸 여기서 배웠습니다. 살아남은 것은 소방이라는 소재와 대원 캐릭터들이었습니다.
 
-- [`foresight/index.html`](foresight/index.html) — 최종 v11. [바로 해보기](https://logan3731.github.io/foresight/archive/foresight/)
+- [`foresight/index.html`](foresight/index.html) — 최종 v11. [바로 해보기](https://logan3731.github.io/incoming/archive/foresight/)
 - [`foresight/README.md`](foresight/README.md) — 당시의 소개 글
 - [`foresight/의사결정기록.md`](foresight/의사결정기록.md) — 무엇을 왜 정했고 무엇을 포기했는지, 결정 단위로
 - [`foresight/개발일지.md`](foresight/개발일지.md)
