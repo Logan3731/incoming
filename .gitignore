@@ -1,6 +1,6 @@
 .DS_Store
-swarm_v1.html
 
-# 작업용 버전 파일. 배포본은 index.html 하나이고,
-# 지난 버전은 git 태그(v2~)로 남긴다
-foresight_v*.html
+# 루트의 작업용 버전 파일. 배포본은 index.html 하나이고,
+# 지난 버전은 git 태그로 남긴다 (예지: v2~v11 · 수신 중: incoming-v5~)
+/foresight_v*.html
+/incoming_v*.html

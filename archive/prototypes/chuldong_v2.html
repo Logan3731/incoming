@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>출동 — 시제품 v2</title>
+<style>
+  :root{
+    --ground:#0F0D0C; --line:#2A211C;
+    --bone:#DCEFF2; --text:#B9C6C9; --dim:#6F7A7C; --faint:#454E50;
+    --ember:#E4552B; --teal:#58C6CC;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;background:var(--ground);overflow:hidden;
+    font-family:var(--sans);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #stage{position:absolute;top:0;left:0;width:620px;height:1060px;transform-origin:top left}
+  canvas{position:absolute;top:0;left:0;width:620px;height:1060px;display:block;touch-action:none}
+  .overlay{position:absolute;top:0;left:0;width:620px;height:1060px;display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    background:var(--ground);color:var(--text);padding:52px 44px;text-align:center}
+  .overlay.on{display:flex}
+  h1{font-size:64px;letter-spacing:.34em;text-indent:.34em;font-weight:800;color:var(--bone);line-height:1}
+  .tag{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--ember);margin-top:18px}
+  .rule{width:104px;height:1px;background:var(--line);margin:28px 0}
+  .brief{text-align:left;max-width:404px;font-size:14px;line-height:1.9;color:var(--text)}
+  .brief b{color:var(--bone)}
+  .brief .row{display:flex;gap:14px;padding:9px 0;border-top:1px solid var(--line)}
+  .brief .row:last-child{border-bottom:1px solid var(--line)}
+  .brief .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ember);flex:none;width:52px;padding-top:5px}
+  .lede{margin-bottom:22px;color:var(--dim);font-size:14px;line-height:1.9}
+  .lede b{color:var(--bone)}
+  h2{font-size:30px;font-weight:800;color:var(--bone);margin-bottom:6px}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--ember);margin-bottom:26px}
+  .stat{font-family:var(--mono);font-size:13px;color:var(--dim);line-height:2.1;margin-bottom:8px}
+  .stat b{color:var(--bone);font-size:17px}
+  .btn{border:none;background:transparent;color:var(--teal);font-family:inherit;
+    font-size:19px;font-weight:800;letter-spacing:.12em;padding:19px 52px;margin-top:38px;cursor:pointer;
+    background-image:linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal));
+    background-repeat:no-repeat;
+    background-size:16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px;
+    background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom}
+  .btn small{font-family:var(--mono);font-size:11px;opacity:.5;font-weight:500}
+  .btn:active{background-color:rgba(88,198,204,.1)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv" width="620" height="1060"></canvas>
+
+  <div class="overlay on" id="ovTitle">
+    <h1>출동</h1>
+    <div class="tag">대원을 모으고, 불은 대원들이 잡는다</div>
+    <div class="rule"></div>
+    <div class="brief">
+      <div class="lede">아래에서 <b>요구조자 10명</b>이 구조를 기다립니다.<br>
+        불을 여기서 막아야 합니다. 10웨이브.</div>
+      <div class="row"><span class="k">고용</span><span>카드를 <b>한 번 누르면 설명</b>, 한 번 더 누르면 고용. 같은 대원 <b>3명 = ★2</b></span></div>
+      <div class="row"><span class="k">배치</span><span>대원을 누르고 다른 칸을 누르면 이동. <b>앞줄이 불을 막고, 뒷줄이 쏩니다</b></span></div>
+      <div class="row"><span class="k">시너지</span><span>같은 계열을 모으면 강해집니다 — <b>진압 · 구조 · 화학 · 지휘</b></span></div>
+      <div class="row"><span class="k">리롤</span><span>1골드로 상점을 새로 봅니다. <b>남긴 골드 5마다 이자 +1</b></span></div>
+      <div class="row"><span class="k">전투</span><span>자동입니다. <b>빈 통로로 새어나간 불은 요구조자를 덮칩니다</b></span></div>
+    </div>
+    <button class="btn" id="btnStart">출동 <small>ENTER</small></button>
+  </div>
+
+  <div class="overlay" id="ovEnd">
+    <h2 id="endTitle">진화 완료</h2>
+    <div class="kicker" id="endKicker">결과</div>
+    <div class="stat" id="endStat"></div>
+    <button class="btn" id="btnAgain">한 번 더 <small>ENTER</small></button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const W=620,H=1060;
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const stage=document.getElementById('stage');
+const ovTitle=document.getElementById('ovTitle'), ovEnd=document.getElementById('ovEnd');
+function fit(){ const s=Math.min(innerWidth/W, innerHeight/H);
+  stage.style.transform='translate('+((innerWidth-W*s)/2)+'px,'+((innerHeight-H*s)/2)+'px) scale('+s+')'; }
+addEventListener('resize',fit); fit();
+
+const C={
+  ground:'#0F0D0C', panel:'#171310', line:'#2A211C',
+  ember:'#E4552B', emberDim:'#7A3420', bone:'#DCEFF2', teal:'#58C6CC',
+  tealSoft:'rgba(88,198,204,.12)', text:'#B9C6C9', dim:'#6F7A7C', faint:'#454E50',
+  gold:'#FFD84A'
+};
+const F_MONO='ui-monospace,SFMono-Regular,Menlo,monospace';
+const F_SANS='-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+const mono=(w,s)=>w+' '+s+'px '+F_MONO;
+const sans=(w,s)=>w+' '+s+'px '+F_SANS;
+
+/* ================= 배치 ================= */
+const LANES=4, LANE_W=140, FX=30, FY=140, FH=470;      // 전장
+const FRONT_Y=FY+FH-60, BACK_Y=FY+FH+10;               // 앞줄 610 · 뒷줄 620+... 실제 계산 사용
+const BREACH=FY+FH+70;                                  // 여길 넘으면 요구조자를 덮친다
+const laneX=i=>FX+LANE_W*i+LANE_W/2;
+const SLOT_R=30;
+const slotPos=i=>({x:laneX(i%LANES), y:(i<LANES?FRONT_Y:BACK_Y)});
+const SHOP_Y=760, SHOP_H=120, BTN_Y=908, BTN_H=64, LOG_Y=1012;
+
+/* ================= 대원 ================= */
+/* trait: sup=진압 res=구조 chem=화학 cmd=지휘 */
+const CREW={
+  byeot :{name:'임볕',   cost:1, tr:['sup'],        hp:45,  atk:6,  int:0.5, note:'속사',
+          sk:{n:'연속 방수', mana:40, d:'3초간 공격 속도 3배'}},
+  dosu  :{name:'마도수', cost:1, tr:['sup'],        hp:115, atk:4,  int:1.0, note:'방수벽',
+          sk:{n:'방수막', mana:50, d:'자기 통로의 불을 전부 밀어내고 감속'}},
+  ire   :{name:'한이레', cost:1, tr:['res'],        hp:55,  atk:5,  int:0.8, note:'갈고리',
+          sk:{n:'갈고리', mana:45, d:'가장 깊이 내려온 불을 끌어올려 잠깐 묶는다'}},
+  semi  :{name:'남세미', cost:1, tr:['chem'],       hp:50,  atk:5,  int:0.9, splash:28, note:'거품',
+          sk:{n:'거품칠', mana:50, d:'대상 주변에 4초 거품 장판 — 지속 피해와 감속'}},
+  suho  :{name:'차수호', cost:2, tr:['sup'],        hp:70,  atk:24, int:1.4, note:'고압 관창',
+          sk:{n:'고압 방수', mana:60, d:'통로를 관통하는 한 줄기 — 닿는 모든 불에 큰 피해'}},
+  gang  :{name:'도강',   cost:2, tr:['res'],        hp:190, atk:6,  int:1.2, note:'중장비',
+          sk:{n:'버팀', mana:50, d:'5초간 받는 피해 60% 감소, 체력 일부 회복'}},
+  danbi :{name:'백단비', cost:2, tr:['chem'],       hp:60,  atk:9,  int:1.0, splash:46, note:'폼 살포',
+          sk:{n:'폼 카펫', mana:70, d:'넓은 거품 융단 — 5초 지속 피해와 감속'}},
+  soryng:{name:'공소령', cost:2, tr:['cmd'],        hp:55,  atk:4,  int:1.0, auraAS:0.15, note:'무전 지휘',
+          sk:{n:'무전', mana:55, d:'전 대원 마나 +20, 3초간 공격 속도 +30%'}},
+  seori :{name:'서리',   cost:3, tr:['chem','cmd'], hp:65,  atk:9,  int:0.9, splash:52, slow:true, note:'냉각',
+          sk:{n:'동결', mana:80, d:'모든 불이 2.5초간 얼어붙는다'}},
+  yeom  :{name:'염동혁', cost:3, tr:['cmd','sup'],  hp:95,  atk:13, int:0.9, auraATK:0.15, note:'현장 반장',
+          sk:{n:'총력전', mana:70, d:'4초간 전 대원 공격 +40%'}}
+};
+const CREW_KEYS=Object.keys(CREW);
+const TRAIT_NAME={sup:'진압',res:'구조',chem:'화학',cmd:'지휘'};
+const TRAIT_DESC={
+  sup:'진압 — 2명: 진압 대원 공격 +25% · 4명: +60%',
+  res:'구조 — 2명: 웨이브가 끝날 때마다 +2G',
+  chem:'화학 — 2명: 화학 대원 공격이 광역화 · 3명: 지속 피해 추가',
+  cmd:'지휘 — 2명: 전 대원 공격 속도 +20%'
+};
+
+/* ================= 불 ================= */
+const FIRES={
+  spark:{name:'불씨',   hp:18,  atk:3,  spd:44, int:0.8, r:9},
+  blaze:{name:'불길',   hp:48,  atk:6,  spd:30, int:1.0, r:13},
+  heat :{name:'복사열', hp:36,  atk:5,  spd:26, int:1.1, r:12, ranged:180},
+  gas  :{name:'가스',   hp:32,  atk:8,  spd:34, int:1.0, r:12, boom:16},
+  core :{name:'화점',   hp:170, atk:10, spd:12, int:1.5, r:17},
+  ash  :{name:'불티',   hp:42,  atk:5,  spd:34, int:1.0, r:12, split:true},
+  back :{name:'백드래프트', hp:950, atk:26, spd:10, int:1.2, r:26, boss:true}
+};
+const WAVES=[
+  {spark:6},
+  {spark:5, blaze:3},
+  {blaze:5, spark:4},
+  {ash:4, blaze:4},
+  {core:2, blaze:5, spark:5},
+  {gas:4, ash:5, blaze:2},
+  {heat:4, blaze:6, spark:4},
+  {core:3, gas:4, blaze:5},
+  {ash:7, heat:4, blaze:4},
+  {back:1, blaze:7, gas:3, ash:3}
+];
+const scaleOf=w=>1+1.0*(w-1);
+
+/* ================= 상태 ================= */
+let S=null, last=0, running=false;
+
+function newRun(){
+  S={ phase:'shop', wave:1, gold:10, surv:10,
+      board:new Array(LANES*2).fill(null),      // 0-3 앞줄, 4-7 뒷줄
+      shop:[], sel:-1, shopSel:-1, log:[], msgT:0,
+      fires:[], units:[], beams:[], spawnQ:[], t:0, speed:1 };
+  rollShop();
+  say(1+'웨이브 — 대원을 고용하고 출동하세요');
+}
+function say(t){ S.log=[t]; S.msgT=4; }
+
+/* ================= 상점 ================= */
+function shopOdds(){
+  const w=S.wave;
+  return w<=3?[0.70,0.25,0.05] : w<=6?[0.50,0.35,0.15] : [0.35,0.40,0.25];
+}
+function rollShop(){
+  const odds=shopOdds();
+  if(S) S.shopSel=-1;
+  S.shop=[];
+  for(let i=0;i<4;i++){
+    const r=Math.random();
+    const tier= r<odds[0]?1 : r<odds[0]+odds[1]?2 : 3;
+    const pool=CREW_KEYS.filter(k=>CREW[k].cost===tier);
+    S.shop.push(pool[Math.floor(Math.random()*pool.length)]);
+  }
+}
+const countOf=k=>S.board.filter(u=>u&&u.k===k&&u.star===1).length;
+function firstEmpty(){ return S.board.findIndex(u=>!u); }
+
+function buy(i){
+  const k=S.shop[i]; if(!k) return false;
+  const c=CREW[k];
+  if(S.gold<c.cost) { say('골드가 부족합니다'); return false; }
+  const willMerge = countOf(k)===2;
+  let slot=firstEmpty();
+  if(slot<0 && !willMerge){ say('자리가 없습니다'); return false; }
+  S.gold-=c.cost; S.shop[i]=null;
+  if(willMerge){
+    // 두 명을 지우고 ★2 하나로
+    const idxs=[]; S.board.forEach((u,j)=>{ if(u&&u.k===k&&u.star===1) idxs.push(j); });
+    const keep=idxs[0];
+    idxs.slice(1).forEach(j=>S.board[j]=null);
+    S.board[keep]={k, star:2};
+    say(c.name+' ★2 — 셋이 하나가 됐다');
+  } else {
+    S.board[slot]={k, star:1};
+  }
+  return true;
+}
+function sell(j){
+  const u=S.board[j]; if(!u) return;
+  const c=CREW[u.k];
+  S.gold += u.star===2 ? c.cost*2 : c.cost;
+  S.board[j]=null; S.sel=-1;
+  say(c.name+' 하차 (+'+(u.star===2?c.cost*2:c.cost)+'G)');
+}
+function reroll(){
+  if(S.gold<1){ say('골드가 부족합니다'); return; }
+  S.gold-=1; rollShop();
+}
+
+/* ================= 시너지 ================= */
+function traitCounts(){
+  const seen={}, cnt={sup:0,res:0,chem:0,cmd:0};
+  S.board.forEach(u=>{
+    if(!u) return;
+    if(seen[u.k]) return; seen[u.k]=1;          // 같은 대원은 1로 센다
+    CREW[u.k].tr.forEach(t=>cnt[t]++);
+  });
+  return cnt;
+}
+function buffs(){
+  const tc=traitCounts();
+  let atkSup = tc.sup>=4?0.6 : tc.sup>=2?0.25 : 0;
+  let asAll  = tc.cmd>=2?0.2 : 0;
+  let chemSplash = tc.chem>=2?25:0;
+  let chemDot = tc.chem>=3;
+  let resGold = tc.res>=2?2:0;
+  // 오라(공소령·염동혁) — 배치돼 있으면 전체 적용
+  let auraAS=0, auraATK=0;
+  S.board.forEach(u=>{ if(!u)return;
+    if(CREW[u.k].auraAS) auraAS=Math.max(auraAS,CREW[u.k].auraAS);
+    if(CREW[u.k].auraATK) auraATK=Math.max(auraATK,CREW[u.k].auraATK); });
+  return {atkSup, asAll:asAll+auraAS, atkAll:auraATK, chemSplash, chemDot, resGold, tc};
+}
+
+/* ================= 전투 ================= */
+function startWave(){
+  if(S.phase!=='shop') return;
+  if(!S.board.some(u=>u)){ say('대원이 없습니다'); return; }
+  S.phase='battle'; S.t=0; S.fires=[]; S.beams=[]; S.shopSel=-1;
+  S.zones=[]; S.fxp=[]; S.floats=[]; S.teamAtkT=0; S.teamAST=0; S.shake=0;
+  const B=buffs();
+  S.units=[];
+  S.board.forEach((u,j)=>{
+    if(!u) return;
+    const c=CREW[u.k], p=slotPos(j), m=u.star===2?2.2:1;
+    const sup=c.tr.includes('sup');
+    S.units.push({
+      k:u.k, star:u.star, lane:j%LANES, front:j<LANES, x:p.x, y:p.y,
+      hp:c.hp*m, maxhp:c.hp*m,
+      atk:c.atk*m*(1+(sup?B.atkSup:0)+B.atkAll),
+      int:c.int/(1+B.asAll), cd:Math.random()*0.3,
+      splash:(c.splash||0)+(c.tr.includes('chem')?B.chemSplash:0),
+      dot:c.tr.includes('chem')&&B.chemDot, slow:!!c.slow,
+      mana:0, manaMax:c.sk.mana, rapidT:0, guardT:0
+    });
+  });
+  // 스폰 예약 — 6초에 걸쳐 흩어져 내려온다
+  S.spawnQ=[];
+  const comp=WAVES[S.wave-1], sc=scaleOf(S.wave);
+  Object.entries(comp).forEach(([k,n])=>{
+    for(let i=0;i<n;i++){
+      S.spawnQ.push({t:Math.random()*1.5, k,
+        lane:Math.floor(Math.random()*LANES), sc});
+    }
+  });
+  S.spawnQ.sort((a,b)=>a.t-b.t);
+  say(S.wave+'웨이브 — 진압 개시');
+}
+
+function spawnFire(q){
+  const f=FIRES[q.k];
+  S.fires.push({k:q.k, lane:q.lane, x:laneX(q.lane)+(Math.random()*40-20),
+    y:FY-20, hp:f.hp*q.sc, maxhp:f.hp*q.sc, atk:f.atk*q.sc,
+    spd:f.spd, int:f.int, cd:0, r:f.r, slowT:0, dotT:0, enrage:0});
+}
+
+function puff(x,y,col,n,spd){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*6.28, v=(0.3+Math.random()*0.7)*(spd||70);
+    S.fxp.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,t:0.5+Math.random()*0.3,max:0.7,col,r:2+Math.random()*3});
+  }
+}
+function floatText(x,y,txt,col,big){
+  S.floats.push({x,y,txt,col,t:big?1.1:0.8,max:big?1.1:0.8,big});
+}
+
+/* ================= 스킬 ================= */
+function castSkill(u){
+  const c=CREW[u.k], m=u.star===2?2.2:1;
+  u.mana=0;
+  floatText(u.x,u.y-40,c.sk.n+'!',C.gold,true);
+  puff(u.x,u.y,C.teal,10,90);
+  if(u.k==='byeot'){ u.rapidT=3; }
+  else if(u.k==='dosu'){
+    S.fires.forEach(f=>{ if(f.lane===u.lane){ f.y=Math.max(FY-10,f.y-90); f.slowT=2;
+      puff(f.x,f.y,C.teal,6,60); } });
+    S.shake=0.2;
+  }
+  else if(u.k==='ire'){
+    let deep=null; S.fires.forEach(f=>{ if(!deep||f.y>deep.y) deep=f; });
+    if(deep){ S.beams.push({x1:u.x,y1:u.y,x2:deep.x,y2:deep.y,t:0.3});
+      deep.y=Math.max(u.y-270,deep.y-200); deep.frzT=1.5; puff(deep.x,deep.y,C.bone,8,70); }
+  }
+  else if(u.k==='semi'){
+    let tgt=null,bd=1e12;
+    S.fires.forEach(f=>{ const d=(f.x-u.x)**2+(f.y-u.y)**2; if(d<bd){bd=d;tgt=f;} });
+    if(tgt) S.zones.push({x:tgt.x,y:tgt.y,r:70,t:4,dps:6*m,slow:true});
+  }
+  else if(u.k==='suho'){
+    const dmg=60*m*(1+(S.teamAtkT>0?0.4:0));
+    S.beams.push({x1:u.x,y1:u.y,x2:u.x,y2:FY,t:0.35,thick:true});
+    S.fires.forEach(f=>{ if(Math.abs(f.x-u.x)<LANE_W/2) hitFire(f,dmg,u); });
+    S.shake=0.25;
+  }
+  else if(u.k==='gang'){ u.guardT=5; u.hp=Math.min(u.maxhp,u.hp+u.maxhp*0.2); }
+  else if(u.k==='danbi'){
+    S.zones.push({x:laneX(1)+LANE_W/2,y:FY+FH*0.55,r:115,t:5,dps:7*m,slow:true});
+  }
+  else if(u.k==='soryng'){
+    S.units.forEach(a=>{ if(a.hp>0&&a!==u) a.mana=Math.min(a.manaMax,a.mana+20); });
+    S.teamAST=Math.max(S.teamAST,3);
+  }
+  else if(u.k==='seori'){
+    S.fires.forEach(f=>{ f.frzT=2.5; });
+    S.shake=0.3; S.frzFlash=0.5;
+  }
+  else if(u.k==='yeom'){ S.teamAtkT=Math.max(S.teamAtkT,4); }
+}
+
+function updateBattle(dt){
+  S.t+=dt;
+  if(S.teamAtkT>0)S.teamAtkT-=dt;
+  if(S.teamAST>0)S.teamAST-=dt;
+  if(S.shake>0)S.shake-=dt*1.6;
+  if(S.frzFlash>0)S.frzFlash-=dt;
+  // 스폰
+  while(S.spawnQ.length&&S.spawnQ[0].t<=S.t) spawnFire(S.spawnQ.shift());
+
+  // 거품 장판
+  for(let i=S.zones.length-1;i>=0;i--){
+    const z=S.zones[i]; z.t-=dt;
+    if(z.t<=0){ S.zones.splice(i,1); continue; }
+    S.fires.forEach(f=>{ if((f.x-z.x)**2+(f.y-z.y)**2<z.r*z.r){
+      f.hp-=z.dps*dt; if(z.slow)f.slowT=Math.max(f.slowT,0.3); } });
+  }
+
+  const alive=S.units.filter(u=>u.hp>0);
+
+  // 불
+  for(let i=S.fires.length-1;i>=0;i--){
+    const f=S.fires[i], FD=FIRES[f.k];
+    if(f.dotT>0){ f.dotT-=dt; f.hp-=3*dt; }
+    if(f.hp<=0){ killFire(i); continue; }
+    if(f.frzT>0){ f.frzT-=dt; continue; }              // 얼어 있으면 아무것도 못 한다
+    if(FD.boss){ f.enrage+=dt; if(f.enrage>8){ f.spd+=6; f.enrage=0; } }
+    // 같은 통로의 살아있는 대원 (앞줄 우선)
+    const block=alive.filter(u=>u.lane===f.lane).sort((a,b)=>a.y-b.y)[0];
+    const speed=f.spd*(f.slowT>0?0.7:1)*(S.t>50?1.8:1);   // 50초가 지나면 불이 몰아친다 — 교착 방지
+    if(f.slowT>0)f.slowT-=dt;
+    if(block){
+      const stopY = FD.ranged ? block.y-FD.ranged : block.y-f.r-20;
+      if(f.y<stopY){ f.y+=speed*dt; }
+      else{
+        f.cd-=dt;
+        if(f.cd<=0){ f.cd=f.int; block.hp-=f.atk*(block.guardT>0?0.4:1);
+          S.beams.push({x1:f.x,y1:f.y,x2:block.x,y2:block.y,t:0.15,hot:true});
+          if(block.hp<=0){
+            if(FIRES[f.k].boom){}          // 이미 붙어 있으니 그대로
+          }
+        }
+      }
+    } else {
+      f.y+=speed*dt;
+      if(f.y>=BREACH){
+        S.fires.splice(i,1);
+        const dmg=FD.boss?3:1;
+        S.surv-=dmg;
+        say(FD.name+'이 뚫고 내려갔다 — 요구조자 '+dmg+'명을 잃었다');
+        if(S.surv<=0){ S.surv=0; finish(false); return; }
+      }
+    }
+  }
+
+  // 대원 사격 — 가장 가까운 불. 공격이 마나를 채우고, 차면 스킬이 나간다
+  alive.forEach(u=>{
+    if(u.guardT>0)u.guardT-=dt;
+    if(u.rapidT>0)u.rapidT-=dt;
+    u.mana=Math.min(u.manaMax,u.mana+4*dt);
+    if(u.mana>=u.manaMax&&S.fires.length){ castSkill(u); }
+    u.cd-=dt;
+    if(u.cd>0) return;
+    let best=null,bd=1e12;
+    const RANGE=290*290;                       // 사거리 밖의 불은 못 쏜다 — 내려올 때까지 기다려야 한다
+    S.fires.forEach(f=>{ const d=(f.x-u.x)**2+(f.y-u.y)**2; if(d<bd&&d<RANGE){bd=d;best=f;} });
+    if(!best) return;
+    const asMul=(u.rapidT>0?3:1)*(S.teamAST>0?1.3:1);
+    u.cd=u.int/asMul;
+    const atkMul=(S.teamAtkT>0?1.4:1);
+    S.beams.push({x1:u.x,y1:u.y,x2:best.x,y2:best.y,t:0.14,thick:u.rapidT>0});
+    puff(best.x,best.y,C.teal,2,40);
+    hitFire(best,u.atk*atkMul,u);
+    u.mana=Math.min(u.manaMax,u.mana+11);
+    if(u.splash>0){
+      S.fires.forEach(f=>{ if(f!==best&&(f.x-best.x)**2+(f.y-best.y)**2<u.splash**2)
+        hitFire(f,u.atk*0.5*atkMul,u); });
+    }
+  });
+  for(let i=S.fires.length-1;i>=0;i--) if(S.fires[i].hp<=0) killFire(i);
+
+  S.beams.forEach(b=>b.t-=dt); S.beams=S.beams.filter(b=>b.t>0);
+  S.fxp.forEach(x=>{x.t-=dt;x.x+=x.vx*dt;x.y+=x.vy*dt;x.vx*=0.92;x.vy*=0.92;});
+  S.fxp=S.fxp.filter(x=>x.t>0);
+  S.floats.forEach(f=>{f.t-=dt;f.y-=24*dt;}); S.floats=S.floats.filter(f=>f.t>0);
+
+  // 웨이브 종료
+  if(!S.spawnQ.length&&!S.fires.length){
+    const B=buffs();
+    const interest=Math.min(3,Math.floor(S.gold/5));
+    const gain=5+interest+B.resGold;
+    S.gold+=gain;
+    if(S.wave>=10){ finish(true); return; }
+    S.wave++; S.phase='shop'; rollShop(); S.sel=-1;
+    say('진압 완료 — +'+gain+'G'+(B.resGold?' (구조반 보너스 +'+B.resGold+')':'')+(interest?' (이자 +'+interest+')':''));
+  }
+}
+
+function hitFire(f,dmg,u){
+  f.hp-=dmg;
+  if(dmg>=25) floatText(f.x,f.y-14,Math.round(dmg),C.bone,false);
+  if(u&&u.slow) f.slowT=1.0;
+  if(u&&u.dot) f.dotT=2.0;
+}
+function killFire(i){
+  const f=S.fires[i], FD=FIRES[f.k];
+  S.fires.splice(i,1);
+  puff(f.x,f.y,C.ember,FD.boss?26:8,FD.boss?150:80);
+  if(FD.boss)S.shake=0.5;
+  if(FD.split){
+    for(let s=0;s<2;s++)
+      S.fires.push({k:'spark',lane:f.lane,x:f.x+(s?14:-14),y:f.y,
+        hp:FIRES.spark.hp*0.6*scaleOf(S.wave),maxhp:FIRES.spark.hp*0.6*scaleOf(S.wave),
+        atk:FIRES.spark.atk*scaleOf(S.wave),spd:FIRES.spark.spd,int:FIRES.spark.int,
+        cd:0,r:8,slowT:0,dotT:0,enrage:0});
+  }
+  if(FD.boom){
+    S.units.forEach(u=>{ if(u.hp>0&&(u.x-f.x)**2+(u.y-f.y)**2<80**2) u.hp-=FD.boom*scaleOf(S.wave); });
+  }
+}
+
+function finish(win){
+  running=false; S.phase='end';
+  document.getElementById('endTitle').textContent = win?'진화 완료':'현장 상실';
+  document.getElementById('endKicker').textContent = win?'10웨이브 방어 성공':S.wave+'웨이브에서 무너짐';
+  document.getElementById('endStat').innerHTML=
+    '요구조자 생존 <b>'+S.surv+'</b> / 10<br>도달 <b>'+S.wave+'</b>웨이브';
+  ovEnd.classList.add('on');
+}
+
+/* ================= 입력 ================= */
+function toLocal(e){ const r=cv.getBoundingClientRect(), sc=r.width/W;
+  return {x:(e.clientX-r.left)/sc,y:(e.clientY-r.top)/sc}; }
+
+cv.addEventListener('pointerdown',e=>{
+  if(!S||S.phase==='end') return;
+  const p=toLocal(e);
+  if(p.y<76&&p.y>48&&p.x>W-150){ start(); return; }   // ↺ 처음부터
+
+  // 시너지 칩 — 누르면 효과 설명
+  if(p.y>58&&p.y<82&&S._chips){
+    for(const c of S._chips){ if(p.x>=c.x-4&&p.x<=c.x+c.w+4){ say(TRAIT_DESC[c.t]); return; } }
+  }
+  // 전투 중에도 대원을 누르면 스킬 설명이 나온다
+  if(S.phase==='battle'){
+    for(let j=0;j<S.board.length;j++){
+      const sp=slotPos(j);
+      if(S.board[j]&&(p.x-sp.x)**2+(p.y-sp.y)**2<(SLOT_R+12)**2){
+        const c=CREW[S.board[j].k];
+        say(c.name+' — '+c.sk.n+': '+c.sk.d); return;
+      }
+    }
+    return;
+  }
+  if(S.phase!=='shop') return;
+
+  // 상점 카드 — 첫 탭은 설명, 같은 카드를 또 누르면 고용
+  if(p.y>SHOP_Y&&p.y<SHOP_Y+SHOP_H){
+    const i=Math.floor((p.x-FX)/LANE_W);
+    if(i>=0&&i<4&&S.shop[i]){
+      if(S.shopSel!==i){
+        S.shopSel=i;
+        const c=CREW[S.shop[i]];
+        say(c.name+' ('+c.cost+'G) — '+c.sk.n+': '+c.sk.d);
+      } else {
+        if(buy(i)) S.shopSel=-1;
+      }
+    }
+    return;
+  }
+  // 버튼 줄
+  if(p.y>BTN_Y&&p.y<BTN_Y+BTN_H){
+    if(p.x<190) reroll();
+    else if(p.x<380){ if(S.sel>=0) sell(S.sel); }
+    else startWave();
+    return;
+  }
+  // 배치 칸
+  for(let j=0;j<S.board.length;j++){
+    const sp=slotPos(j);
+    if((p.x-sp.x)**2+(p.y-sp.y)**2<(SLOT_R+10)**2){
+      if(S.sel===j){ S.sel=-1; }
+      else if(S.sel>=0){ const t=S.board[j]; S.board[j]=S.board[S.sel]; S.board[S.sel]=t; S.sel=-1; }
+      else if(S.board[j]){ S.sel=j;
+        const c=CREW[S.board[j].k];
+        say(c.name+' — '+c.sk.n+': '+c.sk.d); }
+      return;
+    }
+  }
+  S.sel=-1;
+});
+
+addEventListener('keydown',e=>{
+  if(ovTitle.classList.contains('on')||ovEnd.classList.contains('on')){
+    if(e.code==='Enter'||e.code==='Space'){ e.preventDefault(); start(); }
+    return;
+  }
+  if(!S) return;
+  if(e.code==='KeyR'&&S.phase==='shop') reroll();
+  if((e.code==='Enter'||e.code==='Space')&&S.phase==='shop'){ e.preventDefault(); startWave(); }
+});
+
+document.getElementById('btnStart').onclick=start;
+document.getElementById('btnAgain').onclick=start;
+function start(){
+  newRun(); ovTitle.classList.remove('on'); ovEnd.classList.remove('on');
+  running=true; last=performance.now(); requestAnimationFrame(loop);
+}
+
+/* ================= 그리기 ================= */
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(running&&S.phase==='battle') updateBattle(dt);
+  if(S){ if(S.msgT>0)S.msgT-=dt; draw(); }
+  if(running) requestAnimationFrame(loop);
+}
+
+const TRAIT_KEY=['sup','res','chem','cmd'];
+const TRAIT_NEED={sup:'2/4',res:'2',chem:'2/3',cmd:'2'};
+
+function draw(){
+  ctx.fillStyle=C.ground; ctx.fillRect(0,0,W,H);
+
+  /* HUD */
+  ctx.textAlign='left'; ctx.font=sans(800,16); ctx.fillStyle=C.bone;
+  ctx.fillText(S.wave+'웨이브',30,40);
+  ctx.font=mono(500,12); ctx.fillStyle=C.faint; ctx.fillText('/ 10',108,40);
+  ctx.textAlign='center'; ctx.font=mono(700,15); ctx.fillStyle=C.gold;
+  ctx.fillText(S.gold+' G',W/2,40);
+  ctx.textAlign='right'; ctx.font=mono(500,11); ctx.fillStyle=C.faint;
+  ctx.fillText('↺ 처음부터',W-30,64);
+  ctx.textAlign='right'; ctx.font=sans(700,14);
+  ctx.fillStyle=S.surv>4?C.teal:C.ember;
+  ctx.fillText('요구조자 '+S.surv+' / 10',W-30,40);
+
+  /* 시너지 칩 */
+  const B=buffs();
+  ctx.textAlign='left'; ctx.font=mono(500,11);
+  let tx=30; S._chips=[];
+  TRAIT_KEY.forEach(t=>{
+    const n=B.tc[t];
+    const on=(t==='sup'&&n>=2)||(t==='res'&&n>=2)||(t==='chem'&&n>=2)||(t==='cmd'&&n>=2);
+    ctx.fillStyle=on?C.teal:C.faint;
+    const s=TRAIT_NAME[t]+' '+n+'/'+TRAIT_NEED[t];
+    ctx.fillText(s,tx,72);
+    const w=ctx.measureText(s).width;
+    S._chips.push({x:tx,w,t});
+    tx+=w+22;
+  });
+
+  /* 전장 */
+  ctx.fillStyle=C.panel; ctx.fillRect(FX,FY,LANE_W*LANES,FH+130);
+  ctx.strokeStyle=C.line;
+  for(let i=0;i<=LANES;i++){ ctx.beginPath(); ctx.moveTo(FX+i*LANE_W,FY);
+    ctx.lineTo(FX+i*LANE_W,FY+FH+130); ctx.stroke(); }
+  // 돌파선 + 요구조자
+  ctx.setLineDash([6,6]); ctx.strokeStyle=C.ember; ctx.beginPath();
+  ctx.moveTo(FX,BREACH); ctx.lineTo(FX+LANE_W*LANES,BREACH); ctx.stroke(); ctx.setLineDash([]);
+  for(let i=0;i<S.surv;i++){
+    ctx.fillStyle=C.dim;
+    ctx.beginPath(); ctx.arc(FX+18+i*17,BREACH+22,5,0,7); ctx.fill();
+  }
+
+  /* 배치 칸 */
+  for(let j=0;j<S.board.length;j++){
+    const sp=slotPos(j), u=S.board[j];
+    ctx.strokeStyle= S.sel===j?C.teal:C.line; ctx.lineWidth=S.sel===j?2:1;
+    ctx.beginPath(); ctx.arc(sp.x,sp.y,SLOT_R,0,7); ctx.stroke(); ctx.lineWidth=1;
+    if(u) drawCrew(sp.x,sp.y,u.k,u.star,null);
+  }
+
+  /* 전투 중 개체 */
+  if(S.phase==='battle'){
+    const shx=S.shake>0?(Math.random()-0.5)*S.shake*24:0;
+    const shy=S.shake>0?(Math.random()-0.5)*S.shake*24:0;
+    ctx.save(); ctx.translate(shx,shy);
+    // 거품 장판
+    S.zones.forEach(z=>{
+      ctx.fillStyle='rgba(88,198,204,.10)';
+      ctx.beginPath(); ctx.arc(z.x,z.y,z.r,0,7); ctx.fill();
+      ctx.strokeStyle='rgba(88,198,204,.4)'; ctx.setLineDash([5,7]);
+      ctx.beginPath(); ctx.arc(z.x,z.y,z.r,0,7); ctx.stroke(); ctx.setLineDash([]);
+    });
+    S.units.forEach(u=>{ if(u.hp>0) drawCrew(u.x,u.y,u.k,u.star,u); });
+    S.fires.forEach(f=>{
+      const FD=FIRES[f.k];
+      ctx.fillStyle=C.ember;
+      ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,7); ctx.fill();
+      ctx.fillStyle='rgba(255,216,74,.6)';
+      const fl=f.r*0.4+Math.sin(S.t*9+f.x)*2;
+      ctx.beginPath(); ctx.arc(f.x,f.y,Math.max(1,fl),0,7); ctx.fill();
+      // 체력바
+      ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(f.x-14,f.y-f.r-9,28,4);
+      ctx.fillStyle=C.ember; ctx.fillRect(f.x-14,f.y-f.r-9,28*Math.max(0,f.hp/f.maxhp),4);
+      if(f.frzT>0){ ctx.strokeStyle='rgba(220,239,242,.8)'; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.arc(f.x,f.y,f.r+3,0,7); ctx.stroke(); }
+      if(FD.boss){ ctx.textAlign='center'; ctx.font=sans(800,11); ctx.fillStyle=C.bone;
+        ctx.fillText('백드래프트',f.x,f.y-f.r-14); }
+    });
+    S.beams.forEach(b=>{
+      ctx.strokeStyle=b.hot?'rgba(228,85,43,.7)':'rgba(88,198,204,'+(b.thick?0.95:0.7)+')';
+      ctx.lineWidth=b.thick?5:2;
+      ctx.beginPath(); ctx.moveTo(b.x1,b.y1); ctx.lineTo(b.x2,b.y2); ctx.stroke();
+    });
+    S.fxp.forEach(x=>{
+      ctx.globalAlpha=Math.max(0,x.t/x.max);
+      ctx.fillStyle=x.col;
+      ctx.beginPath(); ctx.arc(x.x,x.y,x.r,0,7); ctx.fill();
+      ctx.globalAlpha=1;
+    });
+    S.floats.forEach(f=>{
+      ctx.globalAlpha=Math.min(1,f.t/f.max*1.5);
+      ctx.textAlign='center'; ctx.font=sans(800,f.big?17:13);
+      ctx.lineWidth=4; ctx.strokeStyle='rgba(15,13,12,.9)';
+      ctx.strokeText(f.txt,f.x,f.y); ctx.fillStyle=f.col; ctx.fillText(f.txt,f.x,f.y);
+      ctx.globalAlpha=1;
+    });
+    ctx.restore();
+    if(S.frzFlash>0){
+      ctx.fillStyle='rgba(220,239,242,'+(S.frzFlash*0.25)+')';
+      ctx.fillRect(FX,FY,LANE_W*LANES,FH+130);
+    }
+  }
+
+  /* 상점 */
+  if(S.phase==='shop'){
+    for(let i=0;i<4;i++){
+      const x=FX+i*LANE_W+6, y=SHOP_Y, w=LANE_W-12;
+      const k=S.shop[i];
+      ctx.fillStyle= i===S.shopSel?'rgba(88,198,204,.08)':C.panel; ctx.fillRect(x,y,w,SHOP_H);
+      ctx.strokeStyle= i===S.shopSel?C.teal:(k?C.line:'#1A1613'); ctx.strokeRect(x,y,w,SHOP_H);
+      if(!k) continue;
+      if(i===S.shopSel){ ctx.textAlign='center'; ctx.font=sans(800,10); ctx.fillStyle=C.teal;
+        ctx.fillText('한 번 더 = 고용',x+w/2,y+14); }
+      const c=CREW[k];
+      ctx.textAlign='center';
+      ctx.font=sans(800,16); ctx.fillStyle=S.gold>=c.cost?C.bone:C.faint;
+      ctx.fillText(c.name,x+w/2,y+34);
+      ctx.font=mono(500,10); ctx.fillStyle=C.dim;
+      ctx.fillText(c.tr.map(t=>TRAIT_NAME[t]).join('·'),x+w/2,y+54);
+      ctx.fillStyle=C.teal;
+      ctx.fillText(c.sk.n,x+w/2,y+72);
+      ctx.font=mono(700,13); ctx.fillStyle=C.gold;
+      ctx.fillText(c.cost+'G',x+w/2,y+98);
+      if(countOf(k)===2){ ctx.font=sans(800,10); ctx.fillStyle=C.teal;
+        ctx.fillText('★2!',x+w-16,y+16); }
+    }
+  } else {
+    ctx.textAlign='center'; ctx.font=sans(700,14); ctx.fillStyle=C.faint;
+    ctx.fillText('전 투 중',W/2,SHOP_Y+SHOP_H/2);
+  }
+
+  /* 버튼 */
+  btn(30,BTN_Y,160,BTN_H,'리롤','R · 1G',S.phase==='shop'&&S.gold>=1,false);
+  btn(206,BTN_Y,160,BTN_H, S.sel>=0?'판매':'—','', S.phase==='shop'&&S.sel>=0,false);
+  btn(382,BTN_Y,208,BTN_H,'출동','SPACE',S.phase==='shop',true);
+
+  /* 로그 */
+  ctx.textAlign='center'; ctx.font=sans(500,13);
+  ctx.fillStyle= S.msgT>0?C.text:C.faint;
+  ctx.fillText(S.log[0]||'',W/2,LOG_Y);
+}
+
+function drawCrew(x,y,k,star,live){
+  const c=CREW[k];
+  ctx.fillStyle= live&&live.hp<=0?C.faint:C.bone;
+  ctx.beginPath(); ctx.arc(x,y,star===2?24:19,0,7); ctx.fill();
+  if(star===2){ ctx.strokeStyle=C.gold; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(x,y,28,0,7); ctx.stroke(); ctx.lineWidth=1; }
+  ctx.textAlign='center'; ctx.font=sans(800,12); ctx.fillStyle=C.ground;
+  ctx.fillText(c.name.slice(-2),x,y+4);
+  if(live){
+    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(x-16,y+24,32,4);
+    ctx.fillStyle=C.teal; ctx.fillRect(x-16,y+24,32*Math.max(0,live.hp/live.maxhp),4);
+    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(x-16,y+30,32,3);
+    ctx.fillStyle=C.gold; ctx.fillRect(x-16,y+30,32*Math.min(1,live.mana/live.manaMax),3);
+  }
+}
+
+function btn(x,y,w,h,txt,key,on,accent){
+  const col=!on?C.faint:accent?C.teal:C.text;
+  ctx.fillStyle=on&&accent?'rgba(88,198,204,.07)':'rgba(255,255,255,.02)';
+  ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle=col; ctx.strokeRect(x,y,w,h);
+  ctx.textAlign='center'; ctx.font=sans(800,18); ctx.fillStyle=col;
+  ctx.fillText(txt,x+w/2,y+h/2+2);
+  if(key){ ctx.font=mono(500,10); ctx.fillStyle=on?C.faint:'#332F2A';
+    ctx.fillText(key,x+w/2,y+h-10); }
+}
+
+/* ================= 개발용 ================= */
+window.__dev={
+  start, get s(){return S;},
+  step(dt){ if(S.phase==='battle') updateBattle(dt); },
+  buy, sell, reroll, startWave, rollShop, buffs, countOf,
+  CREW, FIRES, WAVES,
+  ended(){ return ovEnd.classList.contains('on'); },
+  render(){ draw(); }
+};
+})();
+</script>
+</body>
+</html>

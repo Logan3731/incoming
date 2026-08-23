@@ -3,1361 +3,1028 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>예지 — v11</title>
+<title>수신 중</title>
 <style>
-  /* 게임 판과 같은 어법: 상자 대신 표식, 데이터는 고정폭, 불씨는 오직 아직 오지 않은 것 */
   :root{
-    --ground:#12100E; --cell:#1A1613; --line:#2A231D;
-    --bone:#EDE7DA; --text:#C9C0B2; --dim:#7A7266; --faint:#4A443C;
-    --ember:#E4552B; --teal:#6FD3CE;
+    --ground:#0E0D0C; --panel:#151312; --line:#2A2520;
+    --bone:#E3E9EA; --text:#B8BFC1; --dim:#717878; --faint:#474D4E;
+    --ember:#E4552B; --teal:#5FC9CF; --gold:#F2C94C;
     --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
     --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{width:100%;height:100%;background:var(--ground);overflow:hidden;
-    font-family:var(--sans);-webkit-font-smoothing:antialiased;
+    font-family:var(--sans);color:var(--text);-webkit-font-smoothing:antialiased;
     -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
-  #stage{position:absolute;top:0;left:0;width:620px;height:1060px;transform-origin:top left}
-  canvas{position:absolute;top:0;left:0;width:620px;height:1060px;display:block;touch-action:none}
+  #stage{position:absolute;top:0;left:0;width:620px;height:1060px;transform-origin:top left;
+    display:flex;flex-direction:column;background:var(--ground);transition:background .6s}
+  #stage.pov{background:#110c0a}
+  #stage.pov main{background:rgba(228,85,43,.025)}
 
-  .overlay{position:absolute;top:0;left:0;width:620px;height:1060px;display:none;
-    flex-direction:column;align-items:center;justify-content:center;
-    background:var(--ground);color:var(--text);padding:52px 44px;text-align:center}
+  header{padding:22px 28px 12px;border-bottom:1px solid var(--line)}
+  .row1{display:flex;align-items:baseline;justify-content:space-between}
+  #clock{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--bone);letter-spacing:.04em}
+  .lines{display:flex;gap:18px;font-family:var(--mono);font-size:12px}
+  .ln{display:flex;align-items:center;gap:7px;color:var(--faint)}
+  .ln i{width:9px;height:9px;border-radius:50%;background:var(--faint);display:inline-block}
+  .ln.live{color:var(--teal)} .ln.live i{background:var(--teal)}
+  .ln.wait{color:var(--ember)} .ln.wait i{background:var(--ember);animation:blink .9s steps(1) infinite}
+  @keyframes blink{50%{opacity:.15}}
+  .row2{display:flex;gap:8px;margin-top:12px;font-family:var(--mono);font-size:11px;align-items:center}
+  .team{padding:5px 10px;border:1px solid var(--line);color:var(--dim);letter-spacing:.06em}
+  .team.out{color:var(--ember);border-color:#4a2a22}
+  .team.ok{color:var(--teal);border-color:#23474a}
+  #povchip{display:none;margin-left:auto;padding:5px 10px;border:1px solid #5a2a1a;color:var(--ember);letter-spacing:.12em}
+  #stage.pov #povchip{display:block}
+
+  nav{display:flex;border-bottom:1px solid var(--line)}
+  nav button{flex:1;background:none;border:none;color:var(--faint);font-family:var(--mono);
+    font-size:12px;letter-spacing:.16em;padding:13px 0;cursor:pointer;border-bottom:2px solid transparent}
+  nav button.on{color:var(--bone);border-bottom-color:var(--teal)}
+  nav button.dot::after{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ember);margin-left:6px;vertical-align:middle}
+  nav button:disabled{opacity:.3;cursor:default}
+
+  #view{display:none;height:300px;border-bottom:1px solid #3a221a;background:#060504;position:relative;overflow:hidden}
+  #stage.pov #view{display:block}
+  #view svg{width:100%;height:100%;display:block}
+  #view.flash::after{content:'';position:absolute;inset:0;background:#ffb070;animation:flash .5s ease-out forwards}
+  @keyframes flash{0%{opacity:.95}100%{opacity:0}}
+  .card{border:1px solid var(--line);padding:12px 16px;margin-bottom:18px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--dim);display:flex;justify-content:space-between;align-items:baseline}
+  .card b{color:var(--bone);font-size:15px;letter-spacing:.04em}
+  .card.scene{border-color:#5a2a1a;color:#b06a4a} .card.scene b{color:var(--ember)}
+
+  main{flex:1;overflow-y:auto;padding:22px 28px}
+  .pane{display:none} .pane.on{display:block}
+  .msg{margin-bottom:14px;line-height:1.75;font-size:16px;max-width:540px}
+  .msg .who{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--faint);display:block;margin-bottom:2px}
+  .msg.caller{color:var(--bone)}
+  .msg.me{color:var(--teal)}
+  .msg.sys{color:var(--dim);font-family:var(--mono);font-size:12.5px;letter-spacing:.04em}
+  .msg.radio{color:var(--text);font-family:var(--mono);font-size:13.5px;border-left:2px solid var(--line);padding-left:12px}
+  .msg.radio .who{color:var(--ember)}
+  .msg.yun{color:var(--text)} .msg.yun .who{color:var(--gold)}
+  .msg.nar{color:var(--text);font-size:15.5px;line-height:1.85;border-left:2px solid #3a221a;padding-left:12px}
+  .msg.gap{text-align:center;color:var(--faint);font-family:var(--mono);font-size:11px;letter-spacing:.3em;margin:26px 0}
+  .cue{color:var(--dim);font-style:italic}
+  .cur{display:inline-block;width:8px;height:16px;background:var(--bone);vertical-align:-2px;animation:blink .7s steps(1) infinite}
+
+  .manual li{margin:0 0 14px 0;padding-left:32px;position:relative;line-height:1.7;font-size:14.5px;list-style:none}
+  .manual li .n{position:absolute;left:0;top:1px;font-family:var(--mono);color:var(--ember);font-weight:700}
+  .manual li b{color:var(--bone);font-weight:700}
+  .manual li.struck{color:var(--faint);text-decoration:line-through}
+  .manual li.struck .n{color:var(--faint)}
+  .res{font-family:var(--mono);font-size:13px;line-height:2.2}
+  .res b{color:var(--bone);font-weight:600}
+  .res .out{color:var(--ember)} .res .ok{color:var(--teal)}
+  .arc{font-family:var(--mono);font-size:12.5px}
+  .arc .item{border-top:1px solid var(--line);padding:12px 0;cursor:pointer}
+  .arc .item .h{display:flex;justify-content:space-between;color:var(--text)}
+  .arc .item .h small{color:var(--faint)}
+  .arc .item .body{display:none;margin-top:10px}
+  .arc .item.open .body{display:block}
+  .arc .empty{color:var(--faint);line-height:1.8}
+
+  footer{border-top:1px solid var(--line);padding:14px 20px 22px;min-height:150px}
+  .hint{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--faint);margin:0 8px 10px}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{background:var(--panel);border:1px solid var(--line);color:var(--text);text-align:left;
+    font-family:inherit;font-size:15px;padding:13px 16px;cursor:pointer;display:flex;gap:12px;align-items:center}
+  .opt:active{background:#1d1a18}
+  .opt .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ember);flex:none;width:48px}
+  .opt.act .k{color:var(--teal)}
+  .opt:disabled{opacity:.35;cursor:default}
+
+  .overlay{position:absolute;inset:0;background:var(--ground);display:none;flex-direction:column;padding:60px 44px;overflow-y:auto}
   .overlay.on{display:flex}
-
-  h1{font-size:64px;letter-spacing:.34em;text-indent:.34em;font-weight:800;
-     color:var(--bone);line-height:1}
-  .tag{font-family:var(--mono);font-size:11px;letter-spacing:.22em;
-       color:var(--ember);margin-top:18px}
-  .rule{width:104px;height:1px;background:var(--line);margin:28px 0}
-
-  h2{font-size:30px;font-weight:800;color:var(--bone);letter-spacing:.04em;margin-bottom:6px}
-  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.2em;
-          color:var(--ember);margin-bottom:26px}
-
-  .brief{text-align:left;max-width:404px;font-size:14px;line-height:1.9;color:var(--text)}
-  .brief b{color:var(--bone);font-weight:700}
-  .brief .row{display:flex;gap:14px;padding:9px 0;border-top:1px solid var(--line)}
-  .brief .row span:last-child{min-width:0}
-  .brief .row:last-child{border-bottom:1px solid var(--line)}
-  .brief .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ember);
-            flex:none;width:52px;padding-top:5px}
-  .lede{margin-bottom:22px;color:var(--dim);font-size:14px;line-height:1.9}
-  .lede b{color:var(--bone)}
-
-  .btn{position:relative;border:none;background:transparent;color:var(--teal);
-    font-family:inherit;font-size:19px;font-weight:800;letter-spacing:.12em;
-    padding:19px 52px;margin-top:38px;cursor:pointer;
-    background-image:
-      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+  h1{font-size:56px;letter-spacing:.3em;text-indent:.3em;font-weight:800;color:var(--bone);line-height:1;text-align:center}
+  .tag{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--ember);text-align:center;margin-top:16px}
+  .brief{margin:40px auto 0;max-width:440px;font-size:15px;line-height:1.95}
+  .brief p{margin-bottom:16px}
+  .brief b{color:var(--bone)}
+  .btn{display:block;margin:38px auto 0;border:none;background:transparent;color:var(--teal);font-family:inherit;
+    font-size:19px;font-weight:800;letter-spacing:.12em;padding:19px 52px;cursor:pointer;
+    background-image:linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
       linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
       linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
       linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal));
     background-repeat:no-repeat;
     background-size:16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px;
-    background-position:left top,left top,right top,right top,
-                        left bottom,left bottom,right bottom,right bottom;}
-  .btn small{font-family:var(--mono);font-size:11px;letter-spacing:.1em;opacity:.5;font-weight:500}
-  .btn:active{background-color:rgba(111,211,206,.1)}
-
-  .cards{display:flex;flex-direction:column;gap:1px;width:100%;max-width:412px;
-         background:var(--line);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-  .card{background:var(--ground);padding:18px 20px;text-align:left;cursor:pointer;
-        display:flex;gap:14px;align-items:baseline}
-  .card:active{background:rgba(111,211,206,.08)}
-  .card .i{font-family:var(--mono);font-size:11px;color:var(--faint);flex:none;width:16px}
-  .card .n{font-size:18px;font-weight:800;color:var(--bone);flex:none;width:88px}
-  .card .d{font-size:13.5px;color:var(--dim);line-height:1.5}
-
-  .stat{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.06em;
-        margin-bottom:22px}
-  .stat b{color:var(--bone);font-size:15px}
-  .rec{width:100%;max-width:340px;font-family:var(--mono);font-size:12.5px;color:var(--dim)}
-  .rec div{display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line)}
-  .rec div:last-child{border-bottom:1px solid var(--line)}
-  .rec b{color:var(--bone);font-weight:600}
-  .rec .ok{color:var(--teal)} .rec .no{color:var(--ember)}
+    background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom}
+  .btn:disabled{color:var(--faint);opacity:.5}
+  h2{font-size:26px;font-weight:800;color:var(--bone);letter-spacing:.04em}
+  .rep{max-width:520px;margin:28px auto 0;font-size:14.5px;line-height:1.8}
+  .rep h3{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--ember);margin:26px 0 10px}
+  .rep table{width:100%;border-collapse:collapse;font-size:14px}
+  .rep td{padding:9px 6px;border-top:1px solid var(--line);vertical-align:top}
+  .rep td:first-child{font-family:var(--mono);color:var(--dim);width:64px}
+  .rep .truth{color:var(--bone);font-weight:700}
+  .rep .bad{color:var(--ember)} .rep .good{color:var(--teal)}
+  .replay{font-family:var(--mono);font-size:13px;color:var(--dim);line-height:1.9}
+  .replay mark{background:none;color:var(--ember);font-weight:700}
+  .replay .t{color:var(--faint);margin-right:10px}
+  .carry li{margin-left:18px;margin-bottom:6px}
+  .doc{max-width:460px;margin:30px auto 0;border:1px solid var(--line);padding:22px 24px;font-family:var(--mono);font-size:12.5px;line-height:1.9;color:var(--text)}
+  .doc .h{color:var(--ember);letter-spacing:.2em;font-size:10px;margin-bottom:10px}
+  .doc b{color:var(--bone)}
+  .board{max-width:460px;margin:24px auto 0;font-size:14.5px;line-height:1.9}
+  .board li{margin-left:18px;margin-bottom:8px}
+  .board b{color:var(--bone)}
 </style>
 </head>
 <body>
 <div id="stage">
-  <canvas id="cv" width="620" height="1060"></canvas>
-
-  <div class="overlay on" id="ovTitle">
-    <h1>예지</h1>
-    <div class="tag">불이 다음에 어디로 갈지 보인다</div>
-    <div class="rule"></div>
-    <div class="brief">
-      <div class="lede">당신은 현장 지휘관입니다.<br>
-        <b>창백한 표식은 다음 턴에 불이 닿을 자리</b>입니다.<br>
-        끄는 것만이 답은 아닙니다.</div>
-      <div class="row"><span class="k">관창</span><span>인접한 불을 <b>밀어냅니다.</b> 밀면 겨눈 방향이 어긋납니다</span></div>
-      <div class="row"><span class="k">붕괴구</span><span>무너진 바닥. 불을 밀어 넣으면 <b>그대로 꺼집니다</b></span></div>
-      <div class="row"><span class="k">불티</span><span>때리면 갈라져 번집니다. <b>붕괴구는 예외</b></span></div>
-      <div class="row"><span class="k">화점</span><span>꿈쩍도 하지 않습니다. 물로 깎아야 합니다</span></div>
-      <div class="row"><span class="k">균열</span><span>숫자가 0이 되면 바닥이 내려앉습니다. 위에 있으면 같이 떨어집니다</span></div>
-      <div class="row"><span class="k">번짐</span><span>점선 자리로 불이 옮겨붙습니다. 비켜 있지 않으면 다칩니다</span></div>
-      <div class="row"><span class="k">대원</span><span>한 턴에 <b>두 명만</b> 움직입니다. 셋 다는 못 씁니다</span></div>
-      <div class="row"><span class="k">되돌리기</span><span>이동만 됩니다. <b>방수는 확정</b></span></div>
-      <div class="row"><span class="k">층</span><span>12개 층. 층마다 <b>임무가 다릅니다</b> — 진화 · 저지 · 구조 · 백드래프트</span></div>
+  <header>
+    <div class="row1">
+      <div id="clock">22:00:00</div>
+      <div class="lines">
+        <span class="ln" id="l1"><i></i>L1</span>
+        <span class="ln" id="l2"><i></i>L2</span>
+      </div>
     </div>
-    <button class="btn" id="btnStart">시작 <small>ENTER</small></button>
+    <div class="row2"><span id="teams" style="display:flex;gap:8px"></span><span id="povchip"></span></div>
+  </header>
+  <nav>
+    <button class="on" data-tab="call">통화</button>
+    <button data-tab="manual">매뉴얼</button>
+    <button data-tab="res">자원</button>
+    <button data-tab="radio">무전</button>
+    <button data-tab="arc" id="tabArc" disabled>녹취</button>
+  </nav>
+  <div id="view"></div>
+  <main>
+    <div class="pane on" id="pane-call"></div>
+    <div class="pane" id="pane-manual">
+      <ol class="manual" id="manualList">
+        <li><span class="n">1.</span> 첫 응답: <b>"남천 119입니다. 무엇을 도와드릴까요?"</b> 마무리: "소방차량 출동시켰습니다. 저는 상황실 ○○○입니다."</li>
+        <li><span class="n">2.</span> 도입부 공통질문 — ① 위치(정확한 주소. 불가 시 주변 건물·상호·전신주·승강기 번호) ② 연소상황과 인명(불꽃·연기 규모, 구조대상자, 대피 여부, 출입문) ③ 신고자(대상물과의 관계, 연락처)</li>
+        <li><span class="n">3.</span> 예고지령은 접수와 동시에 시작한다. <b>신고자의 목소리만 듣고 장난·허위라고 단정하지 말고 우선 출동 조치한다.</b></li>
+        <li><span class="n">4.</span> 출동기준 3단계 — <b>긴급</b>(즉시 출동) · <b>잠재긴급</b>(방치 시 2차 사고, 출동) · <b>비긴급</b>(인명·재산 우려 없음 → 1차 유관기관·민간 통보, 2차 필요시 출동)</li>
+        <li><span class="n">5.</span> 출동 지령 후 안내: 진입로·대피유도·가스차단 고지. <b>"모르는 번호로 전화가 와도 꼭 받아주세요. 변화가 생기면 즉시 다시 119."</b></li>
+        <li><span class="n">6.</span> 허위신고 과태료(소방기본법 56조): 1회 200만 · 2회 400만 · 3회 이상 500만 원. 판단은 <b>사후 조사</b>로 한다 — 접수 단계에서 가리지 않는다</li>
+        <li><span class="n">7.</span> 미발생 사건 예고·협박성 신고 → 경찰 공동대응 요청. 2차 사고 우려 시 잠재긴급 분류 가능</li>
+        <li><span class="n">8.</span> 가용 자원: 펌프 1팀 · 구조대 1 · 구급 1. 출동 후 복귀까지 약 25분. 가까운 대 또는 반드시 필요한 대부터</li>
+        <li><span class="n">9.</span> 모든 통화는 녹취되어 <b>3개월</b> 보관된다</li>
+        <li class="struck"><span class="n">—</span> 접수자는 출동 판단의 근거를 통화 중 신고자에게 고지한다 <span style="text-decoration:none;color:var(--faint)">(삭제됨)</span></li>
+      </ol>
+    </div>
+    <div class="pane" id="pane-res"><div class="res" id="resBody"></div></div>
+    <div class="pane" id="pane-radio"><div id="radioBody"></div></div>
+    <div class="pane" id="pane-arc"><div class="arc" id="arcBody"></div></div>
+  </main>
+  <footer>
+    <div class="hint" id="hint"></div>
+    <div class="opts" id="opts"></div>
+  </footer>
+
+  <div class="overlay on" id="ovIntro">
+    <h1>수신 중</h1>
+    <div class="tag">밤 1</div>
+    <div class="brief">
+      <p>남천시 119종합상황실. 야간조.<br>
+      오늘부터 <b>혼자 받는다.</b> 옆자리의 <b>윤 주임</b>은 첫 건만 봐주겠다고 했다. 그 말을 하는 데 네 단어를 썼다.</p>
+      <p><b>질문 하나에 시간이 간다.</b> 두 번째 라인이 깜빡이면, 그게 무엇이든 기다리고 있는 것이다.</p>
+      <p>펌프 1팀은 차고에 있다. 차수호, 마도수, 그리고 오늘이 첫 야간인 임볕.</p>
+      <p class="cue">22시 14분. 벨.</p>
+    </div>
+    <button class="btn" id="btnStart">받는다</button>
   </div>
 
-  <div class="overlay" id="ovLevel">
-    <h2 id="lvTitle">1층 돌파</h2>
-    <div class="kicker" id="lvKicker">하나를 고르세요 · 1 2 3</div>
-    <div class="cards" id="lvCards"></div>
+  <div class="overlay" id="ovBoard">
+    <h2 id="boardTitle">밤 2</h2>
+    <div class="tag" id="boardTag">이월</div>
+    <div class="doc" id="boardDoc"></div>
+    <ul class="board" id="boardList"></ul>
+    <button class="btn" id="btnBoard">근무 시작</button>
   </div>
 
-  <div class="overlay" id="ovEnd">
-    <h2 id="endTitle">전멸</h2>
-    <div class="kicker" id="endKicker">기록</div>
-    <div class="stat" id="endStat"></div>
-    <button class="btn" id="btnAgain">한 번 더 <small>ENTER</small></button>
+  <div class="overlay" id="ovReport">
+    <h2 id="repTitle">밤 1 — 근무 기록</h2>
+    <div class="rep" id="repBody"></div>
+    <button class="btn" id="btnNext">밤 2로</button>
+    <button class="btn" id="btnAgain" style="margin-top:14px;color:var(--dim)">처음부터</button>
   </div>
 </div>
 
 <script>
 (function(){
 'use strict';
-const W=620,H=1060;
-const COLS=6, ROWS=8, CELL=88, BX=(W-COLS*CELL)/2, BY=186;
-
-/* ================= 색과 글자 =================
-   색마다 뜻을 하나씩만 준다. 뜻이 겹치면 판이 안 읽힌다.
-     불씨 = 아직 일어나지 않은 일 (예고·균열·증원). 오직 이것만 채도가 높다
-     청록 = 지금 내가 할 수 있는 것 (이동·표적·선택)
-     뼈   = 내 유닛          재 = 적 유닛
-     신호 = 지금 두면 적이 죽는 수. 판에서 가장 밝은 것은 항상 이것 하나 */
-const C={
-  ground:'#0F0D0C', cell:'#191413', line:'#2A211C', tick:'#352A22',
-  void:'#000000',   voidEdge:'#33281F',
-  /* 불 — 지금 타고 있는 것. 화면에서 유일하게 뜨겁다 */
-  ember:'#E4552B',  emberSoft:'rgba(228,85,43,.14)', emberLine:'rgba(228,85,43,.55)',
-  /* 예지 — 지휘관이 보는 앞일. 차갑고 얇다 */
-  frost:'#BFE6EF',  frostSoft:'rgba(191,230,239,.09)', frostLine:'rgba(191,230,239,.5)',
-  /* 물 — 우리 쪽 */
-  teal:'#58C6CC',   tealSoft:'rgba(88,198,204,.10)',
-  bone:'#DCEFF2',   ash:'#D2622A',  ashEdge:'#6E2A0E',
-  /* 지금 두면 꺼지는 수. 판에서 유일한 노랑 */
-  signal:'#FFD84A',
-  text:'#B9C6C9',   dim:'#6F7A7C',   faint:'#454E50'
-};
-const F_MONO='ui-monospace, SFMono-Regular, Menlo, monospace';
-const F_SANS='-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-const mono=(w,s)=>w+' '+s+'px '+F_MONO;
-const sans=(w,s)=>w+' '+s+'px '+F_SANS;
-
-/* 아직 실재하지 않는 것은 테두리가 아니라 '표식'으로 그린다 */
-function bracket(px,py,pad,len,col,wid,w,h){
-  ctx.strokeStyle=col; ctx.lineWidth=wid; ctx.lineCap='butt';
-  const x0=px+pad, y0=py+pad, x1=px+(w||CELL)-pad, y1=py+(h||CELL)-pad;
-  ctx.beginPath();
-  ctx.moveTo(x0,y0+len); ctx.lineTo(x0,y0); ctx.lineTo(x0+len,y0);
-  ctx.moveTo(x1-len,y0); ctx.lineTo(x1,y0); ctx.lineTo(x1,y0+len);
-  ctx.moveTo(x1,y1-len); ctx.lineTo(x1,y1); ctx.lineTo(x1-len,y1);
-  ctx.moveTo(x0+len,y1); ctx.lineTo(x0,y1); ctx.lineTo(x0,y1-len);
-  ctx.stroke();
-}
-function label(txt,x,y,col,size){
-  ctx.textAlign='center'; ctx.font=sans(800,size||13);
-  ctx.lineWidth=4; ctx.strokeStyle='rgba(18,16,14,.95)';
-  ctx.strokeText(txt,x,y); ctx.fillStyle=col; ctx.fillText(txt,x,y);
-}
-const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
-const stage=document.getElementById('stage');
-const ovTitle=document.getElementById('ovTitle'), ovLevel=document.getElementById('ovLevel'), ovEnd=document.getElementById('ovEnd');
-
-function fit(){ const s=Math.min(innerWidth/W, innerHeight/H);
-  stage.style.transform='translate('+((innerWidth-W*s)/2)+'px,'+((innerHeight-H*s)/2)+'px) scale('+s+')'; }
+const $=s=>document.querySelector(s);
+const stage=$('#stage');
+function fit(){ const s=Math.min(innerWidth/620, innerHeight/1060);
+  stage.style.transform='translate('+((innerWidth-620*s)/2)+'px,'+((innerHeight-1060*s)/2)+'px) scale('+s+')'; }
 addEventListener('resize',fit); fit();
 
-/* ================= 층 설계 ================= */
-/* # = 붕괴구 (밀어 넣으면 불이 꺼진다. 지나갈 수 없음)
-   X = 균열 (3턴 뒤 내려앉는다. 그 위에 서 있으면 같이 떨어진다) */
-const CRACK_TURNS=3;
-/* waves: [턴, 종류, x, y] — 그 턴이 끝날 때 등장. 자리는 한 턴 전부터 보인다
-   goal:  진화=불 전멸 / 저지=N턴 생존 / 구조=대원 하나가 맨 윗줄 도달 / 백드래프트 진압
-          목표가 바뀌면 정답도 바뀐다. 버티기 층에서는 죽이는 것이 답이 아니다 */
-const P3=[[1,6],[2,6],[3,6]];
-const G={clear:{t:'clear'}, boss:{t:'boss'}, reach:{t:'reach'},
-         hold:n=>({t:'hold',n})};
-const FLOORS=[
-  { map:['......','.#..#.','......','..XX..','......','.#..#.','......','......'],
-    enemies:[['rush',0,0],['rush',5,0],['gun',2,1]],
-    waves:[[3,'rush',2,0]], par:7, goal:G.clear, players:P3 },
+/* ================= 상태 · 장부 ================= */
+const S={ t:0, fast:false, night:1,
+  teams:{ pump:{name:'1팀', crew:'차수호·마도수·임볕', busy:0}, rescue:{name:'구조대', crew:'한이레·도강', busy:0}, amb:{name:'구급', crew:'', busy:0} },
+  l2wait:null, radio:[], rec:[], cur:null, pov:null, phase:'intro', tools:{callback:false} };
+/* 밤을 넘어 기억되는 것 */
+const L={ c2:null, c3:null, c4:{tier:null, team:null, guided:false, held:false, asked:[]},
+  scene:{gas:null, room:null, carry:null, burn:false}, manso:null, herald:null, c7:null,
+  byeot:{runs:0, wasted:0}, trust:0, fines:0, yunSawClock:false };
 
-  { map:['..#...','......','.#..#.','...X..','..X...','.#..#.','......','...#..'],
-    enemies:[['rush',1,0],['gun',4,0]],
-    waves:[[2,'rush',5,0],[3,'split',0,0],[5,'rush',2,1],[6,'boom',3,0]],
-    par:6, goal:G.hold(6), players:P3 },
-
-  { map:['......','.#.#..','......','..##..','..XX..','.#.#..','......','......'],
-    enemies:[['split',1,0],['split',4,0],['gun',2,1],['rush',3,0]],
-    waves:[[2,'rush',0,0],[4,'split',5,0]], par:9, goal:G.clear, players:P3 },
-
-  { map:['......','##..##','......','.#..#.','......','##..##','......','......'],
-    enemies:[['rush',2,0],['rush',3,0],['gun',0,2],['gun',5,2],['rock',2,3]],
-    waves:[[2,'rush',1,2],[4,'rush',4,2]], par:8, goal:G.reach, players:P3 },
-
-  { map:['......','.X..X.','..##..','#....#','..XX..','.#..#.','......','......'],
-    enemies:[['rock',2,0],['gun',0,1],['gun',5,1],['rush',1,0],['boom',4,1]],
-    waves:[[2,'split',3,0],[4,'rush',2,0],[6,'rush',3,1]], par:10, goal:G.clear, players:P3 },
-
-  { map:['......','.####.','......','#.##.#','......','.####.','......','......'],
-    enemies:[['gun',1,0],['gun',4,0],['rush',0,2],['rush',5,2],['split',2,4]],
-    waves:[[3,'rush',2,0],[5,'boom',3,0]], par:9, goal:G.reach, players:P3 },
-
-  { map:['.X..X.','.#..#.','..XX..','#....#','..##..','.#..#.','......','......'],
-    enemies:[['rock',2,0],['rock',3,0]],
-    waves:[[2,'rush',0,0],[3,'gun',5,0],[4,'split',1,2],[5,'rush',4,2],[6,'boom',2,1],[7,'rush',3,0]],
-    par:7, goal:G.hold(7), players:P3 },
-
-  { map:['......','.#.#..','..XX..','#.##.#','..XX..','.#.#..','......','......'],
-    enemies:[['rock',1,0],['rock',4,0],['gun',0,1],['gun',5,1],['rush',2,1],['split',3,0]],
-    waves:[[3,'rush',2,0],[5,'split',3,0]], par:11, goal:G.clear, players:P3 },
-
-  { map:['..XX..','.#..#.','......','##..##','......','.#..#.','..XX..','......'],
-    enemies:[['rush',2,0],['rush',3,0]],
-    waves:[[2,'gun',0,0],[3,'rush',5,0],[4,'split',1,2],[5,'boom',4,2],[6,'rock',2,1],[7,'rush',3,1],[8,'split',0,1]],
-    par:8, goal:G.hold(8), players:P3 },
-
-  { map:['......','.#..#.','..XX..','#.##.#','..XX..','.#..#.','......','......'],
-    enemies:[['rock',2,0],['rock',3,0],['gun',0,1],['gun',5,1],['rush',1,2],['rush',4,2],['split',2,1]],
-    waves:[[2,'rush',3,0],[4,'split',0,0],[6,'boom',5,0]], par:12, goal:G.clear, players:P3 },
-
-  { map:['......','#.##.#','......','.####.','......','#.##.#','......','......'],
-    enemies:[['gun',2,0],['gun',3,0],['rock',0,2],['rock',5,2],['rush',2,4],['rush',3,4]],
-    waves:[[2,'split',1,1],[4,'rush',4,1],[6,'boom',2,0]], par:10, goal:G.reach, players:P3 },
-
-  { map:['......','.#..#.','......','..XX..','......','.#..#.','......','......'],
-    enemies:[['boss',2,0],['gun',0,1],['gun',5,1],['rush',1,2],['rush',4,2]],
-    waves:[[3,'split',3,0],[5,'rush',2,0],[7,'split',3,1],[9,'rush',1,0]],
-    par:14, goal:G.boss, players:P3 }
-];
-
-/* ================= 유닛 정의 ================= */
-const KIND={
-  push:{name:'관창', side:'p', hp:3, move:4, atk:'push', dmg:1, rng:1},
-  pull:{name:'갈퀴', side:'p', hp:2, move:3, atk:'pull', dmg:1, rng:2},
-  shot:{name:'물대포', side:'p', hp:2, move:2, atk:'line', dmg:2, rng:3},
-  rush :{name:'불길', side:'e', hp:4, move:3, atk:'melee', dmg:2, rng:1},
-  gun  :{name:'복사열', side:'e', hp:3, move:2, atk:'line',  dmg:1, rng:3},
-  boom :{name:'가스', side:'e', hp:2, move:4, atk:'boom',  dmg:3, rng:1},
-  rock :{name:'화점', side:'e', hp:6, move:2, atk:'melee', dmg:3, rng:1, fixed:true},
-  split:{name:'불티', side:'e', hp:3, move:3, atk:'melee', dmg:1, rng:1, splits:true},
-  frag :{name:'불씨', side:'e', hp:2, move:3, atk:'melee', dmg:1, rng:1},
-  boss :{name:'백드래프트', side:'e', hp:16, move:1, atk:'charge', dmg:5, rng:3}
-};
-const PLAYER_KINDS=['push','pull','shot'];
-
-/* ================= 상태 ================= */
-let S=null, uid=1, fxT=0;
-
-function newRun(){
-  S={ floor:0, turn:1, phase:'player', units:[], tiles:[], log:[],
-      sel:null, mode:'idle', cur:{x:2,y:6}, snap:null,
-      up:{pushDist:1, pushDmg:1, shotRng:3, shotDmg:2, pullRng:2, pullDmg:1, move:0, hpBonus:0},
-      crackT:{}, pending:[], flash:[], totalKills:0, pitKills:0,
-      par:0, parBonus:0, record:[], upLeft:0, overCount:0, healNext:0, acts:2, goal:{t:'clear'},
-      anim:{queue:[], t:0, playing:false, skip:false}, actor:null, shake:0 };
-  loadFloor(0);
+const pad=n=>String(n).padStart(2,'0');
+const clockStr=t=>pad(Math.floor(t/3600)%24)+':'+pad(Math.floor(t/60)%60)+':'+pad(t%60);
+const hms=(h,m,s)=>h*3600+m*60+(s||0);
+function tick(sec){ S.t+=sec; $('#clock').textContent=clockStr(S.t);
+  Object.values(S.teams).forEach(tm=>{ if(tm.busy>0) tm.busy=Math.max(0,tm.busy-sec); }); drawTeams(); }
+function jumpTo(h,m,s){ const target=hms(h,m,s||0); let d=target-S.t; if(d<0)d+=86400; tick(d); }
+function drawTeams(){
+  $('#teams').innerHTML=Object.values(S.teams).map(tm=>
+    '<span class="team '+(tm.busy>0?'out':'ok')+'">'+tm.name+(tm.busy>0?' 출동중 '+Math.ceil(tm.busy/60)+'분':' 대기')+'</span>').join('');
+  $('#resBody').innerHTML=Object.values(S.teams).map(tm=>
+    '<b>'+tm.name+'</b> '+(tm.crew?'— '+tm.crew:'')+'<br>'+(tm.busy>0?'<span class="out">출동 중 · 복귀까지 '+Math.ceil(tm.busy/60)+'분</span>':'<span class="ok">차고 대기</span>')+'<br><br>').join('')+
+    '<br><b>도구</b><br>콜백 — '+(S.tools.callback?'<span class="ok">사용 가능</span>':'<span class="out">미해금 (밤 2)</span>')+'<br>발신 위치 조회 — <span class="out">미해금 (밤 3)</span><br>신고 이력 조회 — <span class="out">미해금 (밤 4)</span>';
 }
+function setLine(id,cls){ $('#'+id).className='ln '+(cls||''); if(id==='l2') beepLoop(cls==='wait'); }
+function setPov(p){ S.pov=p; stage.classList.toggle('pov',!!p); $('#povchip').textContent=p?'시점 — '+p:''; }
 
-function loadFloor(i){
-  const F=FLOORS[i];
-  S.floor=i; S.turn=1; S.units=S.units.filter(u=>u.side==='p'); S.log=[];
-  S.tiles=[]; S.crackT={};
-  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
-    const c=F.map[y][x];
-    S.tiles.push(c==='#' ? 'pit' : c==='X' ? 'crack' : 'floor');
-    if(c==='X') S.crackT[idx(x,y)]=CRACK_TURNS;
-  }
-
-  S.pending=(F.waves||[]).map(w=>({turn:w[0], kind:w[1], x:w[2], y:w[3]}));
-  S.par=F.par; S.parBonus=0; S.overCount=0; S.goal=F.goal;
-
-  const prev={}; S.units.filter(u=>u.side==='p').forEach(u=>prev[u.kind]=u);
-  const heal=S.healNext||0; S.healNext=0;
-  S.units=[];
-  PLAYER_KINDS.forEach((k,n)=>{
-    const pos=F.players[n], u=mkUnit(k,pos[0],pos[1]), old=prev[k];
-    if(old){ u.maxhp=old.maxhp; u.hp=Math.min(u.maxhp, old.hp+heal); }
-    else { u.hp=1; pushLog(J(KIND[k].name,'ga')+' 복귀했다 — 체력 1'); }  // 영구 손실은 없다
-    S.units.push(u);
-  });
-
-  // 층 자료에 오타가 나도 깨진 판이 화면에 나가지 않도록, 못 쓸 칸이면 가까운 빈 칸으로 옮긴다
-  F.enemies.forEach(e=>{
-    let [k,x,y]=e;
-    if(tile(x,y)==='pit'||unitAt(x,y)){
-      const spot=[];
-      for(let yy=0;yy<ROWS;yy++) for(let xx=0;xx<COLS;xx++)
-        if(tile(xx,yy)!=='pit'&&!unitAt(xx,yy)) spot.push({x:xx,y:yy,d:Math.abs(xx-x)+Math.abs(yy-y)});
-      spot.sort((a,b)=>a.d-b.d);
-      if(spot.length){ x=spot[0].x; y=spot[0].y; }
-    }
-    S.units.push(mkUnit(k,x,y));
-  });
-
-  S.units.forEach(u=>{ if(u.side==='e') plan(u,true); });
-  S.units.forEach(u=>{ if(u.side==='e') plan(u,true); });
-  startPlayerTurn();
-  pushLog((i+1)+'층 — '+goalText());
-}
-
-function mkUnit(kind,x,y){
-  const K=KIND[kind];
-  const hp=K.hp+(K.side==='p'?S.up.hpBonus:0);
-  return {id:uid++, kind, side:K.side, x, y, ax:x, ay:y, hp, maxhp:hp, moved:false, acted:false, intent:null};
-}
-
-/* ================= 격자 도구 ================= */
-/* 받침 여부에 따라 조사를 고른다 */
-function J(w,t){
-  const c=w.charCodeAt(w.length-1);
-  const has=(c>=0xAC00&&c<=0xD7A3)?((c-0xAC00)%28)!==0:false;
-  return w+(t==='ga'?(has?'이':'가'):t==='reul'?(has?'을':'를'):(has?'과':'와'));
-}
-const NM=u=>KIND[u.kind].name;
-
-const idx=(x,y)=>y*COLS+x;
-const inB=(x,y)=>x>=0&&x<COLS&&y>=0&&y<ROWS;
-const tile=(x,y)=>inB(x,y)?S.tiles[idx(x,y)]:'void';
-const unitAt=(x,y)=>S.units.find(u=>u.x===x&&u.y===y)||null;
-const alive=side=>S.units.filter(u=>u.side===side);
-function moveRange(u){
-  const mv=u.move!==undefined?u.move:(KIND[u.kind].move+(u.side==='p'?S.up.move:0));
-  const seen={}, out=[]; let cur=[[u.x,u.y,0]]; seen[u.x+','+u.y]=true;
-  while(cur.length){
-    const [x,y,d]=cur.shift();
-    if(d>0) out.push({x,y});
-    if(d>=mv) continue;
-    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
-      const nx=x+dx, ny=y+dy, k=nx+','+ny;
-      if(!inB(nx,ny)||seen[k]) return;
-      if(tile(nx,ny)==='pit') return;
-      if(unitAt(nx,ny)) return;
-      seen[k]=true; cur.push([nx,ny,d+1]);
-    });
-  }
-  return out;
-}
-const DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
-
-/* ================= 공격 ================= */
-function attackTargets(u){
-  const out=[];
-  if(u.kind==='push'){
-    DIRS.forEach(([dx,dy])=>{ const t=unitAt(u.x+dx,u.y+dy); if(t&&t.side==='e') out.push({x:t.x,y:t.y,dx,dy}); });
-  } else if(u.kind==='shot'){
-    DIRS.forEach(([dx,dy])=>{
-      for(let r=1;r<=S.up.shotRng;r++){
-        const nx=u.x+dx*r, ny=u.y+dy*r;
-        if(!inB(nx,ny)) break;
-        const t=unitAt(nx,ny);
-        if(t){ if(t.side==='e') out.push({x:nx,y:ny,dx,dy}); break; }
-      }
-    });
-  } else if(u.kind==='pull'){
-    // 당기기는 아군도 대상이 된다 — 위험한 칸에서 끌어내는 용도
-    DIRS.forEach(([dx,dy])=>{
-      for(let r=1;r<=S.up.pullRng;r++){
-        const nx=u.x+dx*r, ny=u.y+dy*r;
-        if(!inB(nx,ny)) break;
-        const t=unitAt(nx,ny);
-        if(t){ out.push({x:nx,y:ny,dx:-dx,dy:-dy,ally:t.side==='p'}); break; }
-      }
-    });
-  }
-  return out;
-}
-
-/* 이 대상을 밀거나 당기면 무슨 일이 일어나는가 — 화면 표시와 판정이 같은 규칙을 쓰도록 한 곳에 둔다 */
-function shoveOutcome(u,t){
-  const e=unitAt(t.x,t.y);
-  if(!e || !(t.dx||t.dy)) return {};
-  if(KIND[e.kind].fixed) return {fixed:true};       // 화점은 움직이지 않는다
-  const steps = u.kind==='push' ? S.up.pushDist : 1;
-  let x=e.x, y=e.y;
-  for(let i=0;i<steps;i++){
-    const nx=x+t.dx, ny=y+t.dy;
-    if(!inB(nx,ny)) return {};                     // 벽에 부딪힘 — 1 피해뿐
-    if(unitAt(nx,ny)) return {};                   // 유닛끼리 충돌 — 서로 1 피해
-    if(tile(nx,ny)==='pit') return e.side==='p' ? {danger:true} : {kill:true};
-    x=nx; y=ny;
-  }
-  return {};
-}
-
-function doAttack(u,t){
-  if(u.kind==='push'){
-    const e=unitAt(t.x,t.y); if(!e) return;
-    pushLog(J(NM(u),'ga')+' '+J(NM(e),'reul')+' 밀었다');
-    damage(e,S.up.pushDmg);
-    if(e.hp>0) for(let i=0;i<S.up.pushDist;i++){ if(e.hp<=0) break; shove(e,t.dx,t.dy); }
-  } else if(u.kind==='pull'){
-    const e=unitAt(t.x,t.y); if(!e) return;
-    fx({type:'beam', x:t.x, y:t.y, x2:u.x, y2:u.y, t:0.26});
-    if(e.side==='e'){
-      pushLog(J(NM(u),'ga')+' '+J(NM(e),'reul')+' 당겼다');
-      damage(e,S.up.pullDmg);
-    } else {
-      pushLog(J(NM(u),'ga')+' '+J(NM(e),'reul')+' 끌어냈다');
-    }
-    if(e.hp>0) shove(e,t.dx,t.dy);
-  } else {
-    const e=unitAt(t.x,t.y); if(!e) return;
-    pushLog(J(NM(u),'ga')+' '+J(NM(e),'reul')+' 사격 ('+S.up.shotDmg+' 피해)');
-    fx({type:'beam', x:u.x, y:u.y, x2:t.x, y2:t.y, t:0.28});
-    damage(e,S.up.shotDmg);
-  }
-  u.acted=true; u.moved=true;
-  afterResolve();
-}
-
-/* 밀기: 벽/유닛에 부딪히면 서로 1 피해, 붕괴구면 그대로 꺼진다 */
-function shove(e,dx,dy){
-  if(KIND[e.kind].fixed){                 // 화점은 밀리지도 당겨지지도 않는다
-    pushLog(NM(e)+'은 꿈쩍도 하지 않는다');
-    fx({type:'text', x:e.x, y:e.y, t:0.7, s:'꿈쩍 안 함'});
-    return;
-  }
-  const nx=e.x+dx, ny=e.y+dy;
-  if(!inB(nx,ny)){ damage(e,1); pushLog('벽에 부딪혔다'); return; }
-  const o=unitAt(nx,ny);
-  if(o){ damage(e,1); damage(o,1); pushLog(J(NM(e),'wa')+' '+J(NM(o),'ga')+' 부딪혔다'); return; }
-  if(tile(nx,ny)==='pit'){
-    e.x=nx; e.y=ny;                                   // 붕괴구까지 밀려 들어간 뒤
-    dropIntoPit(e);                                   // 빨려 들어간다 (불티도 여기선 갈라지지 않는다)
-    return;
-  }
-  e.x=nx; e.y=ny;
-  if(e.side==='e') retarget(e);          // 밀리면 예고 칸이 따라 움직인다 → 빗나갈 수 있다
-}
-
-/* 붕괴구 추락 — kill()을 거치지 않으므로 불티가 갈라지지 않는다. 이게 불티의 해답이다 */
-function dropIntoPit(u){
-  pushLog(J(NM(u),'ga')+' 붕괴구로 꺼졌다');
-  fx({type:'fall', x:u.x, y:u.y, t:0.55, kind:u.kind});
-  S.shake=Math.max(S.shake,0.3);
-  S.units=S.units.filter(z=>z!==u);
-  if(u.side==='e'){
-    S.pitKills++; S.totalKills++;
-    // 지형으로 처치하면 시간을 돌려받는다 — 턴 제한이 밀기·당기기를 벌하지 않도록
-    S.parBonus++;
-    fx({type:'text', x:u.x, y:u.y, t:0.9, s:'턴 +1'});
-    pushLog('붕괴구로 꺼뜨렸다 — 골든타임 +1');
-  }
-}
-const effPar=()=>S.par+S.parBonus;
-
-function fx(o){ o.max=o.t; S.flash.push(o); }
-
-function damage(u,n){
-  u.hp-=n;
-  fx({type:'ring', x:u.x, y:u.y, t:0.4});
-  fx({type:'dmg',  x:u.x, y:u.y, t:0.85, v:n, side:u.side});
-  S.shake=Math.max(S.shake, u.side==='p'?0.28:0.16);
-  if(u.hp<=0) kill(u);
-}
-function kill(u){
-  S.units=S.units.filter(z=>z!==u);
-  if(u.side==='e') S.totalKills++;
-  fx({type:'burst', x:u.ax, y:u.ay, t:0.5, kind:u.kind, side:u.side});
-  if(KIND[u.kind].splits) splitInto(u);
-}
-
-/* 불티는 때려서 끄면 둘로 갈라진다 (붕괴구로 떨어뜨리면 갈라지지 않는다) */
-function splitInto(u){
-  const spots=DIRS.map(([dx,dy])=>({x:u.x+dx,y:u.y+dy}))
-    .filter(c=>inB(c.x,c.y) && tile(c.x,c.y)!=='pit' && !unitAt(c.x,c.y));
-  if(!spots.length){ pushLog(NM(u)+'이 갈라질 자리가 없었다'); return; }
-  const made=spots.slice(0,2).map(c=>{
-    const f=mkUnit('frag',c.x,c.y); S.units.push(f); return f;
-  });
-  made.forEach(f=>{ plan(f,true); fx({type:'ring', x:f.x, y:f.y, t:0.4}); });
-  pushLog(NM(u)+'이 조각 '+made.length+'개로 갈라졌다');
-}
-
-/* ================= 적 예고 ================= */
-function retarget(e){ if(e.intent) e.intent.cells=intentCells(e,e.intent.dir); }
-
-function intentCells(e,dir){
-  const K=KIND[e.kind], out=[];
-  if(K.atk==='melee'){ out.push({x:e.x+dir.dx, y:e.y+dir.dy}); }
-  else if(K.atk==='line'||K.atk==='charge'){
-    for(let r=1;r<=K.rng;r++){
-      const nx=e.x+dir.dx*r, ny=e.y+dir.dy*r;
-      if(!inB(nx,ny)) break;
-      out.push({x:nx,y:ny});
-      if(unitAt(nx,ny)) break;
-    }
-  } else if(K.atk==='boom'){ DIRS.forEach(([dx,dy])=>out.push({x:e.x+dx,y:e.y+dy})); }
-  return out.filter(c=>inB(c.x,c.y));
-}
-
-/* 적 계획: 이동 후 공격 방향 결정. 무작위 없음 — 같은 상황이면 항상 같은 수 */
-function plan(e,noMove){
-  const K=KIND[e.kind];
-  if(K.atk==='charge'){                       // 백드래프트는 부푸는 동안 움직이지 않는다
-    if(e.charge===undefined) e.charge=2;
-    if(e.charge>0){ if(!e.intent) aimCharge(e); return; }
-    aimCharge(e); e.charge=2; return;
-  }
-  if(!noMove){
-    const opts=moveRange(e); opts.push({x:e.x,y:e.y});
-    let best=null,bs=1e9;
-    opts.forEach(o=>{
-      const s=posScore(e,o.x,o.y);
-      if(s<bs-1e-6){ bs=s; best=o; }
-    });
-    if(best){ e.x=best.x; e.y=best.y; }
-  }
-  // 공격 방향 선택. 적은 스스로 같은 편을 쏘지 않는다 —
-  // 그 상황은 플레이어가 '밀어서 만들어내는' 것이어야 재미가 된다.
-  const hasP=c=>{const t=unitAt(c.x,c.y); return t&&t.side==='p';};
-  const hasE=c=>{const t=unitAt(c.x,c.y); return t&&t.side==='e'&&t!==e;};
-  let dir=null;
-  for(const [dx,dy] of DIRS){                       // 1순위: 아군만 맞는 방향
-    const cells=intentCells(e,{dx,dy});
-    if(cells.some(hasP)&&!cells.some(hasE)){ dir={dx,dy}; break; }
-  }
-  if(!dir){                                          // 2순위: 같은 편이 없는 방향 중 가장 가까운 쪽
-    const p=nearestPlayer(e);
-    if(p){
-      const cand=DIRS.map(([dx,dy])=>({dx,dy}))
-        .filter(d=>!intentCells(e,d).some(hasE))
-        .sort((a,b)=>
-          (Math.abs(p.x-(e.x+a.dx*2))+Math.abs(p.y-(e.y+a.dy*2))) -
-          (Math.abs(p.x-(e.x+b.dx*2))+Math.abs(p.y-(e.y+b.dy*2))));
-      dir=cand[0]||null;
-    }
-  }
-  if(!dir){
-    const p=nearestPlayer(e);
-    if(p){ const ax=p.x-e.x, ay=p.y-e.y;
-      dir = Math.abs(ax)>=Math.abs(ay) ? {dx:Math.sign(ax)||1,dy:0} : {dx:0,dy:Math.sign(ay)||1}; }
-  }
-  e.intent = dir ? {dir, cells:intentCells(e,dir)} : null;
-}
-
-function aimCharge(e){
-  const p=nearestPlayer(e);
-  let dir={dx:0,dy:1};
-  if(p){ const ax=p.x-e.x, ay=p.y-e.y;
-    dir = Math.abs(ax)>=Math.abs(ay) ? {dx:Math.sign(ax)||1,dy:0} : {dx:0,dy:Math.sign(ay)||1}; }
-  e.intent={dir, cells:intentCells(e,dir)};
-}
-
-function nearestPlayer(e){
-  let best=null,bd=1e9;
-  alive('p').forEach(p=>{ const d=Math.abs(p.x-e.x)+Math.abs(p.y-e.y); if(d<bd){bd=d;best=p;} });
-  return best;
-}
-function posScore(e,x,y){
-  const K=KIND[e.kind];
-  const ps=alive('p'); if(!ps.length) return 0;
-  // 곧 무너질 균열 위에는 스스로 서지 않는다 — 그 위로 올려놓는 건 플레이어의 몫이어야 한다
-  let hazard=0;
-  // 사선을 잡으려고 죽을 자리에 서지는 않도록, 임박한 균열의 벌점은 다른 모든 점수보다 크게 둔다
-  if(tile(x,y)==='crack'){ const left=S.crackT[idx(x,y)]; hazard = left<=1 ? 500 : left<=2 ? 12 : 3; }
-  let best=1e9;
-  ps.forEach(p=>{
-    const md=Math.abs(p.x-x)+Math.abs(p.y-y);
-    if(K.atk==='line'){
-      const aligned=(p.x===x||p.y===y) && md<=K.rng;
-      best=Math.min(best, aligned?0:100+md);
-    } else {
-      best=Math.min(best, md<=1?0:md);
-    }
-  });
-  return best+hazard;
-}
-
-/* ================= 턴 진행 ================= */
-function startPlayerTurn(){
-  S.phase='player';
-  S.anim={queue:[], t:0, playing:false, skip:false}; S.actor=null;
-  S.acts=2;                          // 한 턴에 움직일 수 있는 유닛 수
-  S.units.filter(u=>u.side==='p').forEach(u=>{
-    u.moved=false; u.acted=false; u.on=false;
-    u.hx=u.x; u.hy=u.y;              // 이 턴을 시작한 자리
-  });
-  S.sel=null; S.mode='idle';
-}
-
-/* 되돌릴 수 있는 것은 '이동'뿐이다. 공격은 확정 —
-   무엇이든 되돌릴 수 있으면 아무 수나 둬보게 되고, 한 수의 무게가 사라진다 */
-function undoTurn(){
-  if(S.phase!=='player') return;
-  const movable=S.units.filter(u=>u.side==='p'&&!u.acted&&(u.x!==u.hx||u.y!==u.hy));
-  if(!movable.length){ pushLog('되돌릴 이동이 없다'); return; }
-  movable.forEach(u=>{
-    if(unitAt(u.hx,u.hy)) return;    // 그 사이 누가 서 있으면 못 돌아간다
-    u.x=u.hx; u.y=u.hy; u.moved=false;
-    if(u.on){ u.on=false; S.acts++; }
-  });
-  S.sel=null;
-  pushLog('이동을 되돌렸다');
-}
-
-/* 적 턴은 한 기씩 순서대로 보여준다. 상태 변화는 각 단계가 실행되는 순간에 일어난다 */
-function endTurn(){
-  if(S.phase!=='player') return;
-  S.phase='enemy'; S.sel=null;
-  const q=[];
-  alive('e').forEach(e=>q.push({t:'attack', id:e.id}));
-  q.push({t:'afterAttacks'});
-  q.push({t:'expandMoves'});
-  S.anim={queue:q, t:0, playing:true, skip:false};
-}
-
-const realPending=()=>S.pending.filter(w=>!w.over).length;
-
-/* 세 기가 다 움직이면 위협을 전부 막을 수 있다. 두 기까지만 — 무엇을 포기할지 고르게 한다 */
-const canAct=u=>u.on || S.acts>0;
-function useAct(u){ if(!u.on){ u.on=true; S.acts--; } }
-
-/* 목표가 바뀌면 최적해가 바뀐다. 버티기 층에서는 죽이는 것이 답이 아니다 */
-function goalMet(){
-  const g=S.goal||{t:'clear'};
-  if(g.t==='hold')  return S.turn>g.n;
-  if(g.t==='reach') return alive('p').some(u=>u.y===0);
-  if(g.t==='boss')  return !alive('e').some(u=>u.kind==='boss');
-  return !alive('e').length && !realPending();
-}
-function goalText(){
-  const g=S.goal||{t:'clear'};
-  if(g.t==='hold')  return '저지 '+Math.min(S.turn,g.n)+' / '+g.n+'턴';
-  if(g.t==='reach') return '위층으로 대원 한 명 진입';
-  if(g.t==='boss')  return '백드래프트 진압';
-  return '진화';
-}
-
-/* 권장 턴을 넘기면 두 턴마다 하나씩 더 온다. 실패는 없지만 상황은 계속 나빠진다 */
-function scheduleOvertime(){
-  const over=S.turn-effPar();
-  if(over<1 || over%3!==1) return;          // 두 턴 → 세 턴 간격
-  if(S.overCount>=2) return;                // 층당 두 기까지. 무한히 불어나지 않는다
-  const spot=freeSpawnCell();
-  if(!spot) return;
-  const kinds=['rush','split','rush','boom','rush','rock'];
-  S.pending.push({turn:S.turn, kind:kinds[S.overCount%kinds.length], x:spot.x, y:spot.y, over:true});
-  S.overCount++;
-  pushLog('골든타임 초과 — 불이 번진다');
-}
-
-function freeSpawnCell(){
-  const rows=[0,1,2];
-  for(const y of rows) for(let x=0;x<COLS;x++)
-    if(tile(x,y)!=='pit' && !unitAt(x,y) && !S.pending.some(w=>w.x===x&&w.y===y)) return {x,y};
-  return null;
-}
-
-/* 균열은 매 턴 하나씩 무너진다. 그 위에 서 있으면 같이 떨어진다 */
-function tickCracks(){
-  Object.keys(S.crackT).forEach(k=>{
-    const i=+k;
-    if(S.tiles[i]!=='crack') return;
-    S.crackT[i]--;
-    if(S.crackT[i]<=0){
-      S.tiles[i]='pit';
-      const x=i%COLS, y=Math.floor(i/COLS);
-      fx({type:'ring', x, y, t:0.5, big:true});
-      S.shake=Math.max(S.shake,0.25);
-      pushLog('균열이 무너졌다');
-      const u=unitAt(x,y);
-      if(u) dropIntoPit(u);
-    }
-  });
-}
-
-function tickAnim(dt){
-  const A=S.anim; if(!A||!A.playing) return;
-  A.t-=dt;
-  let guard=0;
-  while(A.playing && A.t<=0 && guard++<300){
-    if(!A.queue.length){ A.playing=false; S.actor=null; break; }
-    const d=runStep(A.queue.shift());
-    A.t += A.skip ? Math.min(d,0.03) : d;
-  }
-}
-
-function runStep(it){
-  const A=S.anim;
-  const stop=()=>{ A.queue.length=0; A.playing=false; S.actor=null; };
-
-  if(it.t==='attack'){
-    const e=S.units.find(u=>u.id===it.id);
-    if(!e || e.side!=='e' || !e.intent) return 0;
-    S.actor=e.id; retarget(e);
-    const K=KIND[e.kind];
-    if(K.atk==='charge'){
-      if(e.charge>1){ e.charge--; pushLog(NM(e)+'가 부푼다 — '+e.charge+'턴 뒤'); return 0.3; }
-      e.charge=0;
-    }
-    const victims=[];
-    e.intent.cells.slice().forEach(c=>{
-      const t=unitAt(c.x,c.y);
-      if(t && t!==e) victims.push(t);           // 아군이든 적이든 그 칸에 있으면 맞는다
-    });
-    if(K.atk==='line'&&victims.length)
-      fx({type:'beam', x:e.x, y:e.y, x2:victims[0].x, y2:victims[0].y, t:0.3, hostile:true});
-    victims.forEach(t=>{ if(S.units.includes(t)) damage(t,K.dmg); });
-    if(K.atk==='boom'){
-      pushLog(J(NM(e),'ga')+' 터졌다'); S.shake=Math.max(S.shake,.45);
-      fx({type:'ring', x:e.x, y:e.y, t:0.5, big:true}); kill(e);
-    } else if(victims.length){
-      const friendly=victims.some(v=>v.side==='e');
-      pushLog(J(NM(e),'ga')+' '+J(NM(victims[0]),'reul')+' 맞혔다'+(friendly?' — 같은 편이다':' ('+K.dmg+' 피해)'));
-    } else {
-      pushLog(NM(e)+'의 공격이 빗나갔다');
-      e.intent.cells.forEach(c=>fx({type:'text', x:c.x, y:c.y, t:0.7, s:'빗나감'}));
-    }
-    return 0.34;
-  }
-
-  if(it.t==='afterAttacks'){
-    S.actor=null;
-    // 균열은 적이 움직이기 전에 무너진다 — 올려놓은 적이 걸어나가 버리면 의미가 없다
-    tickCracks();
-    if(!alive('p').length){ stop(); endRun(false); return 0; }
-    return 0.06;
-  }
-
-  if(it.t==='expandMoves'){
-    if(goalMet()){ stop(); floorClear(); return 0; }
-    alive('e').forEach(e=>A.queue.push({t:'move', id:e.id}));
-    A.queue.push({t:'spawn'}); A.queue.push({t:'reaim'}); A.queue.push({t:'done'});
-    return 0.08;
-  }
-
-  /* 증원 — 등장 자리는 한 턴 전부터 보인다. 그 칸에 서 있으면 밀려나며 다친다 */
-  if(it.t==='spawn'){
-    const due=S.pending.filter(w=>w.turn<=S.turn);
-    if(!due.length) return 0;
-    S.pending=S.pending.filter(w=>w.turn>S.turn);
-    due.forEach(w=>{
-      if(tile(w.x,w.y)==='pit'){                 // 자료 오타가 깨진 판으로 이어지지 않게
-        const spot=freeSpawnCell(); if(!spot) return; w.x=spot.x; w.y=spot.y;
-      }
-      const occ=unitAt(w.x,w.y);
-      if(occ){
-        damage(occ,2);
-        if(S.units.includes(occ)){
-          const spot=DIRS.map(([dx,dy])=>({x:occ.x+dx,y:occ.y+dy}))
-            .find(c=>inB(c.x,c.y)&&tile(c.x,c.y)!=='pit'&&!unitAt(c.x,c.y));
-          if(spot){ occ.x=spot.x; occ.y=spot.y; if(occ.side==='e') retarget(occ); }
-        }
-      }
-      if(unitAt(w.x,w.y)) return;                  // 여전히 막혀 있으면 이번 증원은 무산
-      const e=mkUnit(w.kind,w.x,w.y);
-      S.units.push(e); plan(e,true);
-      fx({type:'ring', x:w.x, y:w.y, t:0.5, big:true});
-      pushLog(J(NM(e),'ga')+' 번져 붙었다');
-    });
-    S.shake=Math.max(S.shake,0.3);
-    return 0.34;
-  }
-
-  if(it.t==='move'){
-    const e=S.units.find(u=>u.id===it.id);
-    if(!e) return 0;
-    S.actor=e.id;
-    const ox=e.x, oy=e.y;
-    plan(e,false);
-    return (e.x!==ox||e.y!==oy) ? 0.24 : 0.08;
-  }
-
-  if(it.t==='reaim'){
-    // 먼저 움직인 적의 사선에 나중 적이 끼어들 수 있으므로 조준만 한 번 더 돈다
-    alive('e').forEach(e=>plan(e,true));
-    alive('e').forEach(e=>plan(e,true));
-    S.actor=null;
-    return 0.06;
-  }
-
-  if(it.t==='done'){
-    S.actor=null;
-    if(!alive('p').length){ endRun(false); return 0; }
-    if(goalMet()){ floorClear(); return 0; }
-    S.turn++;
-    scheduleOvertime();
-    startPlayerTurn();
-    return 0;
-  }
-  return 0;
-}
-
-function afterResolve(){
-  if(goalMet()){ floorClear(); return; }
-  if(!alive('p').length){ endRun(false); return; }
-}
-
-/* ================= 강화 ================= */
-const UPS=[
-  {n:'고압',   d:'관창이 불을 2칸 민다',      f:()=>S.up.pushDist=2},
-  {n:'직사',   d:'관창의 피해 +1',            f:()=>S.up.pushDmg+=1},
-  {n:'가압',    d:'물대포의 사거리 +1',          f:()=>S.up.shotRng+=1},
-  {n:'긴 갈퀴', d:'갈퀴의 사거리 +1',          f:()=>S.up.pullRng+=1},
-  {n:'억센 손', d:'갈퀴의 피해 +1',            f:()=>S.up.pullDmg+=1},
-  {n:'고압노즐', d:'물대포의 피해 +1',            f:()=>S.up.shotDmg+=1},
-  {n:'경장비',  d:'두 대원의 이동력 +1',       f:()=>S.up.move+=1},
-  {n:'방화복',  d:'두 대원의 체력 +1 (즉시 회복)', f:()=>{S.up.hpBonus+=1;
-      S.units.filter(u=>u.side==='p').forEach(u=>{u.maxhp+=1;u.hp+=1;});}}
-];
-
-function floorClear(){
-  const eff=effPar();
-  const inPar = (S.goal&&(S.goal.t==='hold')) ? true : S.turn<=eff;
-  S.record.push({floor:S.floor+1, turns:S.turn, par:eff, inPar});
-  S.pending=[];                                   // 남은 초과 증원 예고는 지운다
-  if(S.floor>=FLOORS.length-1){ endRun(true); return; }
-  S.upLeft = 1;                                   // 강화는 늘 하나. 앞서간다고 더 세지지 않는다
-  S.healNext = (inPar?1:0) + ((S.floor+1)%4===0?1:0);   // 보상은 회복. 다음 층으로 누적되지 않는다
-  showUpgrade(inPar);
-}
-
-function showUpgrade(inPar){
-  S.phase='level';
-  document.getElementById('lvTitle').textContent =
-    (S.floor+1)+'층 돌파';
-  document.getElementById('lvKicker').textContent =
-    (S.healNext ? '골든타임 달성 — 체력 '+S.healNext+' 회복' : '하나를 고르세요 · 1 2 3');
-  const pool=UPS.slice(), pick=[];
-  while(pick.length<3&&pool.length) pick.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
-  const box=document.getElementById('lvCards'); box.innerHTML='';
-  pick.forEach((u,i)=>{
-    const el=document.createElement('div'); el.className='card';
-    el.innerHTML='<span class="i">'+(i+1)+'</span><span class="n">'+u.n+'</span><span class="d">'+u.d+'</span>';
-    el.onclick=()=>{
-      u.f(); S.upLeft--;
-      if(S.upLeft>0){ showUpgrade(false); return; }   // 보상이 남았으면 한 번 더 고른다
-      ovLevel.classList.remove('on'); loadFloor(S.floor+1);
-    };
-    box.appendChild(el);
-  });
-  ovLevel.classList.add('on');
-}
-
-function endRun(win){
-  S.phase='end';
-  if(!S.record.some(r=>r.floor===S.floor+1))       // 못 깬 층도 기록에 남긴다
-    S.record.push({floor:S.floor+1, turns:S.turn, par:effPar(), inPar:false, failed:true});
-  document.getElementById('endTitle').textContent = win?'불을 잡았다':'철수';
-  const rows=S.record.map(r=>
-    '<div><span>'+r.floor+'층</span><span><b>'+r.turns+'</b> / '+r.par+'턴 '+
-    (r.failed?'<span class="no">실패</span>':(r.inPar?'<span class="ok">달성</span>':'<span>&nbsp;</span>'))+
-    '</span></div>').join('');
-  document.getElementById('endStat').innerHTML=
-    '도달 <b>'+(S.floor+1)+'</b>/'+FLOORS.length+'층   처치 <b>'+S.totalKills+
-    '</b>   붕괴구 <b>'+S.pitKills+'</b>'+
-    '<div class="rec" style="margin-top:18px">'+rows+'</div>';
-  ovEnd.classList.add('on');
-}
-
-function pushLog(t){ S.log.push(t); if(S.log.length>3) S.log.shift(); }
-
-/* ================= 입력 ================= */
-function cellFromPx(px,py){
-  const x=Math.floor((px-BX)/CELL), y=Math.floor((py-BY)/CELL);
-  return inB(x,y)?{x,y}:null;
-}
-
-/* 손가락으로도 전부 되도록 화면 버튼을 둔다 (키보드는 그대로 유지) */
-/* 폰에서는 화면에 맞춰 축소되므로 버튼을 넉넉히 잡는다 (88px → 축소돼도 손가락 크기 이상) */
-const UI={
-  undo:{x:46, y:940, w:190, h:88},
-  end :{x:248, y:940, w:326, h:88},
-  skip:{x:46, y:940, w:528, h:88},
-  cards:[{x:46,y:56,w:168,h:84},{x:226,y:56,w:168,h:84},{x:406,y:56,w:168,h:84}]
-};
-const hit=(r,p)=>p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h;
-
-cv.addEventListener('pointerdown',e=>{
-  if(!S) return;
-  const r=cv.getBoundingClientRect(), sc=r.width/W;
-  const p={x:(e.clientX-r.left)/sc, y:(e.clientY-r.top)/sc};
-
-  if(S.phase==='enemy'){ S.anim.skip=true; return; }      // 연출 중 어디를 눌러도 건너뛰기
-  if(S.phase!=='player') return;
-
-  if(hit(UI.end,p)){ endTurn(); return; }
-  if(hit(UI.undo,p)){ undoTurn(); return; }
-  for(let i=0;i<UI.cards.length;i++){                      // 상단 카드를 눌러도 유닛 선택
-    if(hit(UI.cards[i],p)){
-      const u=S.units.filter(z=>z.side==='p')[i];
-      if(u){ S.sel=u; S.cur={x:u.x,y:u.y}; }
-      return;
-    }
-  }
-  const c=cellFromPx(p.x,p.y);
-  if(c){ S.cur=c; activate(c.x,c.y); }
+/* ================= 탭 ================= */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  if(b.disabled) return;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); $('#pane-'+b.dataset.tab).classList.add('on');
+  if(b.dataset.tab==='radio') b.classList.remove('dot');
+  if(b.dataset.tab==='arc') drawArchive();
+  if(b.dataset.tab==='call') scrollDown();
+  if(b.dataset.tab==='manual'){ S.manualSeen=true; if(S.manualGate){ S.manualGate(); S.manualGate=null; } }
 });
 
-/* 커서 칸에 대해 문맥에 맞는 행동 */
-function activate(x,y){
-  const u=unitAt(x,y);
-  if(S.sel){
-    const s=S.sel;
-    const tg=attackTargets(s).find(t=>t.x===x&&t.y===y);
-    if(tg&&!s.acted&&canAct(s)){ useAct(s); doAttack(s,tg); S.sel=null; return; }
-    if(!s.moved && canAct(s) && moveRange(s).some(c=>c.x===x&&c.y===y)){
-      useAct(s); s.x=x; s.y=y; s.moved=true;
-      afterResolve();          // 돌파 층은 '도착'이 곧 클리어다. 이동도 판정을 불러야 한다
-      return;
-    }
-  }
-  if(u&&u.side==='p'&&!u.acted){ S.sel=u; return; }
-  if(u&&u.side==='p'&&u.acted){ S.sel=u; return; }
-  S.sel=null;
-}
-
-const KMAP={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right'};
-addEventListener('keydown',e=>{
-  // 오버레이 처리
-  if(ovTitle.classList.contains('on')||ovEnd.classList.contains('on')){
-    if(e.code==='Enter'||e.code==='Space'){ e.preventDefault(); start(); }
-    return;
-  }
-  if(ovLevel.classList.contains('on')){
-    const i={Digit1:0,Digit2:1,Digit3:2}[e.code];
-    const box=document.getElementById('lvCards');
-    if(i!==undefined&&box.children[i]){ e.preventDefault(); box.children[i].click(); }
-    return;
-  }
-  if(S&&S.phase==='enemy'){                      // 적 턴 연출 중에는 건너뛰기만
-    if(e.code==='Space'||e.code==='Enter'){ e.preventDefault(); S.anim.skip=true; }
-    return;
-  }
-  if(!S||S.phase!=='player') return;
-  const d=KMAP[e.code];
-  if(d){ e.preventDefault();
-    if(d==='up')S.cur.y=Math.max(0,S.cur.y-1);
-    if(d==='down')S.cur.y=Math.min(ROWS-1,S.cur.y+1);
-    if(d==='left')S.cur.x=Math.max(0,S.cur.x-1);
-    if(d==='right')S.cur.x=Math.min(COLS-1,S.cur.x+1);
-    return; }
-  if(e.code==='Enter'){ e.preventDefault(); activate(S.cur.x,S.cur.y); return; }
-  if(e.code==='Escape'){ e.preventDefault(); S.sel=null; return; }
-  if(e.code==='Space'){ e.preventDefault(); endTurn(); return; }
-  if(e.code==='KeyU'){ e.preventDefault(); undoTurn(); return; }
-  const pick={Digit1:0,Digit2:1,Digit3:2}[e.code];
-  if(pick!==undefined){
-    e.preventDefault();
-    const u=S.units.filter(z=>z.side==='p')[pick];
-    if(u){ S.sel=u; S.cur={x:u.x,y:u.y}; }
-  }
-});
-
-document.getElementById('btnStart').onclick=start;
-document.getElementById('btnAgain').onclick=start;
-function start(){
-  ovTitle.classList.remove('on'); ovEnd.classList.remove('on'); ovLevel.classList.remove('on');
-  newRun();
-}
-
-/* ================= 그리기 ================= */
-function loop(t){
-  const dt=Math.min(0.05,(t-fxT)/1000||0); fxT=t;
-  if(S){
-    tickAnim(dt);
-    const k=1-Math.exp(-17*dt);                    // 칸 사이를 미끄러지듯 이동
-    S.units.forEach(u=>{
-      if(u.ax===undefined){ u.ax=u.x; u.ay=u.y; }
-      u.ax+=(u.x-u.ax)*k; u.ay+=(u.y-u.ay)*k;
-    });
-    S.shake=Math.max(0,S.shake-dt*1.7);
-    S.flash.forEach(f=>f.t-=dt); S.flash=S.flash.filter(f=>f.t>0);
-    draw();
-  }
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-
-const cx=x=>BX+x*CELL+CELL/2, cy=y=>BY+y*CELL+CELL/2;
-
-function draw(){
-  ctx.fillStyle=C.ground; ctx.fillRect(0,0,W,H);
-  alive('e').forEach(retarget);   // 예고 표시가 항상 실제 결과와 같도록 매 프레임 갱신
-  drawHUD();
-
-  const sh=S.shake, sx=sh?(Math.random()-0.5)*sh*20:0, sy=sh?(Math.random()-0.5)*sh*20:0;
-  ctx.save(); ctx.translate(sx,sy);
-
-  // 바닥 — 도면처럼. 칸은 면이 아니라 격자와 눈금으로 읽힌다
-  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-    const px=BX+x*CELL, py=BY+y*CELL, t=tile(x,y);
-    if(t==='pit'){
-      ctx.fillStyle=C.void; ctx.fillRect(px,py,CELL,CELL);
-      bracket(px,py,6,13,C.voidEdge,2);
-    } else if(t==='crack'){
-      ctx.fillStyle=C.cell; ctx.fillRect(px,py,CELL,CELL);
-      ctx.strokeStyle=C.frostLine; ctx.lineWidth=1.5;     // 갈라진 금
-      ctx.beginPath();
-      ctx.moveTo(px+10,py+CELL-14); ctx.lineTo(px+CELL*0.44,py+CELL*0.52);
-      ctx.lineTo(px+CELL*0.32,py+16); ctx.moveTo(px+CELL*0.44,py+CELL*0.52);
-      ctx.lineTo(px+CELL-12,py+CELL*0.34); ctx.stroke();
-      ctx.textAlign='center'; ctx.font=mono(700,15); ctx.fillStyle=C.frost;
-      ctx.fillText(S.crackT[idx(x,y)], px+CELL/2, py+18);  // 남은 턴 — 위 가운데
-    } else {
-      ctx.fillStyle=C.cell; ctx.fillRect(px,py,CELL,CELL);
-    }
-  }
-  ctx.strokeStyle=C.line; ctx.lineWidth=1;
-  for(let x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(BX+x*CELL,BY); ctx.lineTo(BX+x*CELL,BY+ROWS*CELL); ctx.stroke(); }
-  for(let y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(BX,BY+y*CELL); ctx.lineTo(BX+COLS*CELL,BY+y*CELL); ctx.stroke(); }
-  ctx.strokeStyle=C.tick; ctx.lineWidth=1;                  // 교차점 눈금
-  for(let x=1;x<COLS;x++)for(let y=1;y<ROWS;y++){
-    const gx=BX+x*CELL, gy=BY+y*CELL;
-    ctx.beginPath(); ctx.moveTo(gx-4,gy); ctx.lineTo(gx+4,gy);
-    ctx.moveTo(gx,gy-4); ctx.lineTo(gx,gy+4); ctx.stroke();
-  }
-
-  // 적 예고 — 채워진 칸이 아니라 조준 표식. 아직 실재하지 않는 일이다
-  alive('e').forEach(e=>{
-    if(!e.intent) return;
-    const K=KIND[e.kind];
-    const d=e.intent.dir, X0=cx(e.ax), Y0=cy(e.ay);
-    ctx.strokeStyle=C.frostLine; ctx.lineWidth=1.5;        // 궤적
-    ctx.setLineDash([5,5]);
-    const far=e.intent.cells[e.intent.cells.length-1];
-    if(far){ ctx.beginPath(); ctx.moveTo(X0+d.dx*CELL*0.3, Y0+d.dy*CELL*0.3);
-      ctx.lineTo(cx(far.x), cy(far.y)); ctx.stroke(); }
-    ctx.setLineDash([]);
-    e.intent.cells.forEach(c=>{
-      if(!inB(c.x,c.y)) return;
-      const px=BX+c.x*CELL, py=BY+c.y*CELL;
-      ctx.fillStyle=C.frostSoft; ctx.fillRect(px,py,CELL,CELL);
-      bracket(px,py,7,15,C.frost,2.5);
-      ctx.textAlign='center'; ctx.font=mono(700,17); ctx.fillStyle=C.frost;
-      ctx.fillText('-'+K.dmg, px+CELL/2, py+CELL-10);      // 아래 가운데 — 모서리 표식을 피한다
-    });
-  });
-
-  // 증원 예고 — 이번 턴이 끝나면 이 칸에 나타난다
-  S.pending.filter(w=>w.turn<=S.turn).forEach(w=>{
-    const px=BX+w.x*CELL, py=BY+w.y*CELL;
-    const p=0.55+0.45*Math.sin(fxT/220);
-    ctx.globalAlpha=p;
-    bracket(px,py,7,15,C.frost,2);
-    ctx.setLineDash([4,6]); ctx.strokeStyle=C.frostLine; ctx.lineWidth=1.5;
-    ctx.strokeRect(px+7,py+7,CELL-14,CELL-14); ctx.setLineDash([]);
-    ctx.globalAlpha=1;
-    ctx.textAlign='center'; ctx.font=sans(800,12); ctx.fillStyle=C.frost;
-    ctx.fillText('번짐', px+CELL/2, py+CELL/2+4);
-  });
-
-  // 돌파 층 — 어디로 가야 하는지 판 위에 그린다
-  if(S.goal&&S.goal.t==='reach'){
-    const p=0.5+0.5*Math.sin(fxT/300);
-    for(let x=0;x<COLS;x++){
-      if(tile(x,0)==='pit') continue;
-      const px=BX+x*CELL;
-      ctx.globalAlpha=0.35+p*0.35;
-      ctx.setLineDash([6,6]); ctx.strokeStyle=C.teal; ctx.lineWidth=2;
-      ctx.strokeRect(px+4,BY+4,CELL-8,CELL-8); ctx.setLineDash([]);
-      ctx.globalAlpha=1;
-    }
-    ctx.textAlign='center'; ctx.font=sans(800,12); ctx.fillStyle=C.teal;
-    ctx.fillText('여기까지', BX+COLS*CELL/2, BY-2);
-  }
-
-  // 선택 유닛이 지금 할 수 있는 것
-  if(S.sel&&S.phase==='player'){
-    if(!S.sel.moved && canAct(S.sel)) moveRange(S.sel).forEach(c=>{
-      const px=BX+c.x*CELL, py=BY+c.y*CELL;
-      ctx.fillStyle=C.tealSoft; ctx.fillRect(px,py,CELL,CELL);
-      ctx.fillStyle=C.teal; ctx.globalAlpha=.55;
-      ctx.beginPath(); ctx.arc(px+CELL/2,py+CELL/2,3,0,7); ctx.fill();
-      ctx.globalAlpha=1;
-    });
-    if(!S.sel.acted && canAct(S.sel)) attackTargets(S.sel).forEach(t=>{
-      const px=BX+t.x*CELL, py=BY+t.y*CELL;
-      const r=shoveOutcome(S.sel,t);
-      // 판에서 가장 밝은 것은 언제나 '지금 두면 죽는 수' 하나뿐이다
-      const col = r.kill ? C.signal : r.danger ? C.ember : r.fixed ? C.faint : C.teal;
-      bracket(px,py,5,17,col,r.kill?3.5:2.5);
-
-      if((t.dx||t.dy) && !r.fixed){                          // 어디로 밀리는지
-        const X=BX+t.x*CELL+CELL/2, Y=BY+t.y*CELL+CELL/2;
-        const a=Math.atan2(t.dy,t.dx), L=CELL*0.46;
-        ctx.strokeStyle=col; ctx.lineWidth=2.5;
-        ctx.beginPath();
-        ctx.moveTo(X+Math.cos(a)*CELL*0.24, Y+Math.sin(a)*CELL*0.24);
-        ctx.lineTo(X+Math.cos(a)*L, Y+Math.sin(a)*L);
-        ctx.moveTo(X+Math.cos(a)*L, Y+Math.sin(a)*L);
-        ctx.lineTo(X+Math.cos(a+2.5)*L*0.6, Y+Math.sin(a+2.5)*L*0.6);
-        ctx.moveTo(X+Math.cos(a)*L, Y+Math.sin(a)*L);
-        ctx.lineTo(X+Math.cos(a-2.5)*L*0.6, Y+Math.sin(a-2.5)*L*0.6);
-        ctx.stroke();
-      }
-      if(r.kill||r.danger||r.fixed)
-        label(r.kill?'꺼짐':r.danger?'위험':'안 밀림', px+CELL/2, py+19, col, 13);
-    });
-  }
-
-  // 바닥에 깔리는 이펙트
-  S.flash.filter(f=>f.type==='beam'||f.type==='fall').forEach(drawFx);
-
-  // 유닛
-  S.units.forEach(u=>drawUnit(u));
-
-  // 유닛 위에 뜨는 이펙트
-  S.flash.filter(f=>f.type!=='beam'&&f.type!=='fall').forEach(drawFx);
-
-  // 커서
-  if(S.phase==='player'){
-    const px=BX+S.cur.x*CELL, py=BY+S.cur.y*CELL;
-    ctx.strokeStyle=C.bone; ctx.lineWidth=1;
-    ctx.strokeRect(px+0.5,py+0.5,CELL-1,CELL-1);
-  }
-
-  ctx.restore();
-
-  // 적 턴 표시
-  if(S.phase==='enemy'){
-    ctx.textAlign='center';
-    ctx.font=sans(800,14); ctx.fillStyle=C.ember;
-    ctx.fillText('불의 차례', W/2-44, BY-15);
-    ctx.font=mono(500,11); ctx.fillStyle=C.dim;
-    ctx.fillText(S.anim.skip?'SKIPPING':'SPACE — 건너뛰기', W/2+46, BY-15);
-  }
-
-  drawLog();
-}
-
-function drawFx(f){
-  const a=Math.max(0,f.t/f.max);
-  const X=BX+f.x*CELL+CELL/2, Y=BY+f.y*CELL+CELL/2;
-  if(f.type==='ring'){
-    ctx.strokeStyle=C.bone; ctx.globalAlpha=a*.85; ctx.lineWidth=f.big?3:1.5;
-    const r=(f.big?CELL*0.62:CELL*0.42)*(1.4-a*0.4);
-    ctx.beginPath(); ctx.arc(X,Y,r,0,7); ctx.stroke(); ctx.globalAlpha=1;
-  }
-  else if(f.type==='burst'){
-    ctx.strokeStyle=(f.side==='p'?C.bone:C.ash); ctx.globalAlpha=a*.9; ctx.lineWidth=2;
-    for(let i=0;i<6;i++){
-      const ang=i*Math.PI/3, d=CELL*0.2+(1-a)*CELL*0.42;
-      ctx.beginPath(); ctx.moveTo(X+Math.cos(ang)*d, Y+Math.sin(ang)*d);
-      ctx.lineTo(X+Math.cos(ang)*(d+9), Y+Math.sin(ang)*(d+9)); ctx.stroke();
-    }
-    ctx.globalAlpha=1;
-  }
-  else if(f.type==='dmg'){
-    const rise=(1-a)*26, al=Math.min(1,a*1.6);
-    ctx.textAlign='center'; ctx.font=mono(700,26);
-    ctx.globalAlpha=al;
-    ctx.lineWidth=5; ctx.strokeStyle=C.ground; ctx.strokeText('-'+f.v, X, Y-16-rise);
-    ctx.fillStyle=(f.side==='p'?C.ember:C.bone); ctx.fillText('-'+f.v, X, Y-16-rise);
-    ctx.globalAlpha=1;
-  }
-  else if(f.type==='text'){
-    const rise=(1-a)*14;
-    ctx.globalAlpha=Math.min(1,a*1.6);
-    label(f.s, X, Y-6-rise, C.teal, 15);
-    ctx.globalAlpha=1;
-  }
-  else if(f.type==='beam'){
-    const X2=BX+f.x2*CELL+CELL/2, Y2=BY+f.y2*CELL+CELL/2;
-    ctx.strokeStyle=(f.hostile?C.ember:C.teal); ctx.globalAlpha=a*.95;
-    ctx.lineWidth=2+a*3;
-    ctx.beginPath(); ctx.moveTo(X,Y); ctx.lineTo(X2,Y2); ctx.stroke(); ctx.globalAlpha=1;
-  }
-  else if(f.type==='fall'){
-    const s=Math.max(0.02,a), r=CELL*0.28*s;
-    ctx.save(); ctx.translate(X,Y); ctx.rotate((1-a)*3.4);
-    ctx.fillStyle=C.ash; ctx.globalAlpha=a*.85;
-    ctx.beginPath(); ctx.moveTo(0,-r); ctx.lineTo(r,r*0.8); ctx.lineTo(-r,r*0.8);
-    ctx.closePath(); ctx.fill(); ctx.restore(); ctx.globalAlpha=1;
-  }
-}
-
-function drawUnit(u){
-  const X=cx(u.ax), Y=cy(u.ay), r=CELL*0.27;
-  const sel = S.sel===u, mine = u.side==='p';
-  if(S.actor===u.id){                                  // 지금 움직이는 적
-    const p=0.5+0.5*Math.sin(fxT/110);
-    ctx.strokeStyle=C.frost; ctx.globalAlpha=0.3+p*0.5; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.arc(X,Y,CELL*0.42,0,7); ctx.stroke(); ctx.globalAlpha=1;
-  }
-  // 지금 실재하는 것은 면으로 그린다 (예고는 선으로만 그려진다)
-  ctx.fillStyle = mine ? (u.acted ? '#6E6A62' : C.bone) : C.ash;
-  if(mine){
-    if(u.kind==='push'){ ctx.fillRect(X-r,Y-r,r*2,r*2); }
-    else if(u.kind==='pull'){
-      ctx.beginPath(); ctx.moveTo(X-r,Y-r*0.85); ctx.lineTo(X+r,Y-r*0.85); ctx.lineTo(X,Y+r);
-      ctx.closePath(); ctx.fill();
-    }
-    else { ctx.beginPath(); ctx.moveTo(X,Y-r); ctx.lineTo(X+r,Y); ctx.lineTo(X,Y+r); ctx.lineTo(X-r,Y); ctx.closePath(); ctx.fill(); }
-    if(sel){ ctx.strokeStyle=C.teal; ctx.lineWidth=1.5;
-      ctx.beginPath(); ctx.moveTo(X-r-7,Y+r+9); ctx.lineTo(X+r+7,Y+r+9); ctx.stroke(); }
-  } else {
-    if(u.kind==='rush'){ ctx.beginPath(); ctx.moveTo(X,Y-r); ctx.lineTo(X+r,Y+r*0.8); ctx.lineTo(X-r,Y+r*0.8); ctx.closePath(); ctx.fill(); }
-    else if(u.kind==='gun'){ ctx.fillRect(X-r*0.9,Y-r*0.9,r*1.8,r*1.8); }
-    else if(u.kind==='rock'){
-      ctx.beginPath();
-      for(let k=0;k<6;k++){ const a=k*Math.PI/3+Math.PI/6;
-        ctx[k?'lineTo':'moveTo'](X+Math.cos(a)*r*1.14, Y+Math.sin(a)*r*1.14); }
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle=C.ground; ctx.lineWidth=3; ctx.stroke();
-    }
-    else if(u.kind==='split'||u.kind==='frag'){
-      const s=u.kind==='split'?1:0.66;
-      ctx.beginPath(); ctx.arc(X-r*0.26*s, Y, r*0.62*s, 0, 7); ctx.fill();
-      ctx.beginPath(); ctx.arc(X+r*0.26*s, Y, r*0.62*s, 0, 7); ctx.fill();
-    }
-    else if(u.kind==='boss'){
-      ctx.beginPath();
-      for(let k=0;k<8;k++){ const a=k*Math.PI/4;
-        ctx[k?'lineTo':'moveTo'](X+Math.cos(a)*r*1.42, Y+Math.sin(a)*r*1.42); }
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle=C.ember; ctx.lineWidth=2; ctx.stroke();
-    }
-    else { ctx.beginPath(); ctx.arc(X,Y,r*0.9,0,7); ctx.fill(); }
-    ctx.strokeStyle=C.ashEdge; ctx.lineWidth=1.5;
-    if(u.kind==='rush'){ ctx.beginPath(); ctx.moveTo(X,Y-r); ctx.lineTo(X+r,Y+r*0.8); ctx.lineTo(X-r,Y+r*0.8); ctx.closePath(); ctx.stroke(); }
-    else if(u.kind==='gun'){ ctx.strokeRect(X-r*0.9,Y-r*0.9,r*1.8,r*1.8); }
-    if(u.kind==='boss'&&u.charge>0){
-      ctx.textAlign='center'; ctx.font=mono(700,18); ctx.fillStyle=C.ember;
-      ctx.fillText(u.charge, X, Y+6);
-    }
-    if(u.intent){                                      // 어느 쪽을 겨누는지
-      const d=u.intent.dir;
-      ctx.strokeStyle=C.ember; ctx.lineWidth=2.5;
-      ctx.beginPath(); ctx.moveTo(X+d.dx*r*1.2, Y+d.dy*r*1.2);
-      ctx.lineTo(X+d.dx*r*2.0, Y+d.dy*r*2.0); ctx.stroke();
-    }
-  }
-  // 체력 — 눈금으로
-  const n=u.maxhp, gap=7, w=3, sx=X-(n*gap-2)/2, yy=Y+CELL*0.35;
-  for(let i=0;i<n;i++){
-    ctx.fillStyle = i<u.hp ? (mine?C.teal:'#FFB27A') : 'rgba(255,255,255,.12)';
-    ctx.fillRect(sx+i*gap, yy, w, 5);
-  }
-}
-
-function drawHUD(){
-  const eff=effPar(), over=S.turn>eff, near=S.turn>eff-2;
-
-  // 계기판 한 줄 — 상자 대신 눈금과 가는 선으로
-  ctx.textAlign='left'; ctx.font=sans(800,15); ctx.fillStyle=C.bone;
-  ctx.fillText((S.floor+1)+'층', 46, 40);
-  ctx.font=mono(500,12); ctx.fillStyle=C.faint;
-  ctx.fillText('/ '+FLOORS.length, 46+ctx.measureText('  ').width+34, 40);
-
-  ctx.textAlign='right'; ctx.font=mono(700,15);
-  ctx.fillStyle = over ? C.ember : near ? C.bone : C.text;
-  ctx.fillText(S.turn+' / '+eff, W-46, 40);
-  ctx.font=mono(500,11); ctx.fillStyle= over?C.ember:C.faint;
-  ctx.fillText(over?'골든타임 초과':'골든타임', W-46, 56);
-  ctx.textAlign='left'; ctx.font=sans(700,12); ctx.fillStyle=C.teal;
-  ctx.fillText(goalText(), 46, 56);
-
-  // 턴이 얼마나 남았는지를 선 하나로. 넘어서면 색이 바뀐다
-  const barY=68, barW=W-92;
-  ctx.fillStyle=C.line; ctx.fillRect(46,barY,barW,2);
-  ctx.fillStyle = over ? C.ember : C.teal;
-  ctx.fillRect(46,barY,barW*Math.min(1,S.turn/eff),2);
-
-  // 부대 — 상자 없이, 세로 가는 선으로만 나눈다
-  const ps=S.units.filter(u=>u.side==='p');
-  const colW=(W-92)/3;
-  ps.forEach((u,i)=>{
-    const x=46+i*colW, sel=S.sel===u;
-    if(i>0){ ctx.fillStyle=C.line; ctx.fillRect(x-1,86,1,54); }
-    ctx.textAlign='left';
-    ctx.font=mono(500,10); ctx.fillStyle=C.faint;
-    ctx.fillText(String(i+1), x+2, 100);
-    ctx.font=sans(800,16); ctx.fillStyle= sel?C.teal : u.acted?C.dim:C.bone;
-    ctx.fillText(KIND[u.kind].name, x+16, 101);
-    for(let k=0;k<u.maxhp;k++){                        // 체력 눈금
-      ctx.fillStyle = k<u.hp ? (sel?C.teal:C.text) : 'rgba(255,255,255,.12)';
-      ctx.fillRect(x+16+k*8, 110, 4, 6);
-    }
-    ctx.font=mono(500,10);
-    const idle = !u.on && S.acts<=0;
-    ctx.fillStyle = u.acted||idle ? C.faint : u.moved ? C.ember : C.dim;
-    ctx.fillText(u.acted?'행동 완료':idle?'이번 턴 불가':u.moved?'공격만 가능':'대기', x+16, 134);
-    if(sel){ ctx.fillStyle=C.teal; ctx.fillRect(x, 86, 2, 54); }
-  });
-
-  // 남은 적
-  ctx.textAlign='right'; ctx.font=mono(500,11); ctx.fillStyle=C.dim;
-  ctx.fillText('불 '+alive('e').length+(realPending()?'  ·  번짐 '+realPending():''), W-46, 120);
-  ctx.font=mono(700,13); ctx.fillStyle= S.acts>0 ? C.teal : C.faint;
-  ctx.fillText('행동 '+S.acts+' / 2', W-46, 138);
-
-  ctx.fillStyle=C.line; ctx.fillRect(46,154,W-92,1);
-
-  // 고른 유닛이 무엇을 할 수 있는지
-  ctx.textAlign='center'; ctx.font=sans(500,13);
-  if(S.sel){
-    ctx.fillStyle=C.teal;
-    ctx.fillText(abilityText(S.sel)+'   ·   이동 '+(KIND[S.sel.kind].move+S.up.move), W/2, BY-16);
-  } else {
-    ctx.fillStyle=C.faint;
-    ctx.fillText('대원을 눌러 고르세요', W/2, BY-16);
-  }
-}
-
-function abilityText(u){
-  if(u.kind==='push') return '인접한 불을 '+S.up.pushDist+'칸 밀고 '+S.up.pushDmg+' 피해';
-  if(u.kind==='pull') return S.up.pullRng+'칸 안의 대상을 1칸 당긴다 (불에는 '+S.up.pullDmg+' 피해)';
-  return '직선 '+S.up.shotRng+'칸까지 '+S.up.shotDmg+' 피해';
-}
-
-function drawLog(){
-  ctx.textAlign='center'; ctx.font=sans(500,13);
-  const last=S.log.slice(-2);
-  last.forEach((t,i)=>{
-    ctx.fillStyle= i===last.length-1 ? C.text : C.faint;
-    ctx.fillText(t, W/2, 906+i*17);
-  });
-  drawButtons();
-}
-
-function button(r,txt,key,on,accent){
-  const col = !on ? C.faint : accent ? C.teal : C.text;
-  ctx.fillStyle = on&&accent ? 'rgba(111,211,206,.07)' : 'rgba(255,255,255,.02)';
-  ctx.fillRect(r.x,r.y,r.w,r.h);
-  bracket(r.x,r.y,0,16,col,on?2:1,r.w,r.h);            // 판 위의 표식과 같은 어법
-  ctx.textAlign='center';
-  ctx.fillStyle=col; ctx.font=sans(800,22);
-  ctx.fillText(txt, r.x+r.w/2, r.y+r.h/2+4);
-  if(key){
-    ctx.font=mono(500,11); ctx.fillStyle= on?C.faint:'#332F2A';
-    ctx.fillText(key, r.x+r.w/2, r.y+r.h-14);
-  }
-}
-
-function drawButtons(){
-  if(S.phase==='enemy'){
-    button(UI.skip, S.anim.skip?'건너뛰는 중':'건너뛰기', 'SPACE · 화면 아무 곳', !S.anim.skip, false);
-    return;
-  }
-  const on = S.phase==='player';
-  const canUndo = on && S.units.some(u=>u.side==='p'&&!u.acted&&(u.x!==u.hx||u.y!==u.hy));
-  button(UI.undo,'이동 취소','U',canUndo,false);
-  button(UI.end,'턴 종료','SPACE',on,true);
-}
-
-/* ================= 개발용 ================= */
-window.__dev={
-  start, get s(){return S;},
-  end(){ return ovEnd.classList.contains('on'); },
-  lvl(){ return ovLevel.classList.contains('on'); },
-  endTurn, undoTurn, activate, moveRange, attackTargets, doAttack, KIND, tickAnim, shoveOutcome,
-  render(){ draw(); },
-  // 연출을 기다리지 않고 턴을 끝까지 해결한다 (검증용)
-  resolveTurn(){ endTurn(); if(S.anim) S.anim.skip=true;
-    let g=0; while(S.anim&&S.anim.playing&&g++<600) tickAnim(1);
-    return S.phase; },
-  unitAt:(x,y)=>unitAt(x,y), alive, tile
+/* ================= 소리 ================= */
+let AC=null, beepTimer=null;
+function audioInit(){ if(S.fast) return; try{ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); }catch(e){} }
+function tone(freq,dur,gain,type){ if(!AC) return; const o=AC.createOscillator(), g=AC.createGain(), t=AC.currentTime;
+  o.type=type||'sine'; o.frequency.value=freq; o.connect(g); g.connect(AC.destination);
+  g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.start(t); o.stop(t+dur); }
+function noise(dur,gain,freq,q){ if(!AC) return; const n=(AC.sampleRate*dur)|0, b=AC.createBuffer(1,n,AC.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+  const src=AC.createBufferSource(); src.buffer=b; const f=AC.createBiquadFilter(); f.type='bandpass'; f.frequency.value=freq||1800; f.Q.value=q||0.8;
+  const g=AC.createGain(); g.gain.value=gain; src.connect(f); f.connect(g); g.connect(AC.destination); src.start(); }
+const sfx={
+  key(){ noise(.028,.16,2600,0.6); tone(210+Math.random()*60,.035,.05,'triangle'); if(Math.random()<0.18) tone(3600,.02,.025,'sine'); },
+  bell(){ tone(2900,.22,.05,'sine'); tone(4300,.12,.02,'sine'); },
+  ring(){ const r=()=>{ tone(440,.45,.07); tone(480,.45,.07); }; r(); setTimeout(r,650); },
+  beep(){ tone(920,.08,.045); },
+  squelch(){ noise(.08,.10,1600); },
+  hangup(){ [0,320,640].forEach(d=>setTimeout(()=>tone(425,.16,.05),d)); },
+  stamp(){ tone(160,.09,.14,'triangle'); noise(.04,.06,600); },
+  cough(){ noise(.12,.07,700); },
+  breath(){ noise(.35,.03,500,0.5); },
+  crack(){ noise(.06,.12,900); tone(90,.12,.1,'triangle'); }
 };
+function beepLoop(on){ if(beepTimer){ clearInterval(beepTimer); beepTimer=null; } if(on&&!S.fast) beepTimer=setInterval(()=>sfx.beep(),1500); }
+document.addEventListener('pointerdown',()=>{ if(AC&&AC.state==='suspended') AC.resume(); });
+
+/* ================= 출력 ================= */
+const pane=$('#pane-call');
+function scrollDown(){ const m=$('main'); m.scrollTop=m.scrollHeight; }
+function record(cls,who,html){ if(S.cur) S.cur.lines.push({cls,who,html}); }
+function line(cls,who,html){
+  const d=document.createElement('div'); d.className='msg '+cls;
+  d.innerHTML=(who?'<span class="who">'+who+'</span>':'')+html;
+  pane.appendChild(d); scrollDown(); record(cls,who,html); return d;
+}
+const cueHtml=t=>t.replace(/(\([^)]*\))/g,'<span class="cue">$1</span>');
+function type(cls,who,text){
+  if(S.fast){ line(cls,who,cueHtml(text)); return Promise.resolve(); }
+  return new Promise(res=>{
+    const d=line(cls,who,''); const body=document.createElement('span'); d.appendChild(body);
+    const cur=document.createElement('span'); cur.className='cur'; d.appendChild(cur);
+    const parts=text.split(/(\([^)]*\))/); let html='', i=0, j=0;
+    function step(){
+      if(i>=parts.length){ cur.remove(); sfx.bell(); res(); return; }
+      const p=parts[i];
+      if(p.startsWith('(')){ html+='<span class="cue">'+p+'</span>'; i++; j=0; body.innerHTML=html; scrollDown();
+        if(p.includes('기침')) sfx.cough(); else if(p.includes('숨')) sfx.breath(); else noise(.05,.03,900);
+        setTimeout(step,300); return; }
+      if(j<p.length){ html+=p[j]; j++; body.innerHTML=html; scrollDown();
+        const ch=p[j-1]; if(ch!==' ') sfx.key();
+        setTimeout(step,(ch==='…'?240:/[.?!]/.test(ch)?170:36)); }
+      else { i++; j=0; step(); }
+    }
+    step();
+  });
+}
+const me=t=>line('me','나',t);
+const sys=t=>line('sys','',t);
+const nar=t=>type('nar','',t);
+const gap=t=>line('gap','',t);
+const yun=t=>type('yun','윤 주임',t);
+function radio(who,t){
+  sfx.squelch(); const stamp=clockStr(S.t).slice(0,5);
+  S.radio.push({stamp,who,t});
+  $('#radioBody').innerHTML=S.radio.map(r=>'<div class="msg radio"><span class="who">'+r.stamp+' · '+r.who+'</span>'+r.t+'</div>').join('');
+  const nb=document.querySelector('nav button[data-tab=radio]'); if(!nb.classList.contains('on')) nb.classList.add('dot');
+  return line('radio',null,'<span class="who">'+stamp+' · '+who+'</span>'+t);
+}
+const wait=ms=>S.fast?Promise.resolve():new Promise(r=>setTimeout(r,ms));
+function menu(items,hint){
+  return new Promise(res=>{
+    $('#hint').textContent=hint||''; const box=$('#opts'); box.innerHTML='';
+    items.forEach(o=>{
+      const b=document.createElement('button'); b.className='opt'+(o.act?' act':'');
+      b.innerHTML='<span class="k">'+o.k+'</span>'+o.t; if(o.disabled) b.disabled=true;
+      b.onclick=()=>{ box.innerHTML=''; $('#hint').textContent=''; res(o.id); };
+      box.appendChild(b);
+    });
+  });
+}
+/* 질문을 고르면 묻고 답을 듣는다. 행동을 고르면 돌아온다 */
+async function converse(who, qs, acts, hintFn, onAsked){
+  const asked=[];
+  while(true){
+    const avail=qs.filter(q=>!asked.includes(q.id)&&(!q.when||q.when(asked)));
+    const items=[...avail.slice(0,3).map(q=>({id:q.id,k:'질문',t:q.t})), ...acts(asked)];
+    const id=await menu(items, hintFn?hintFn(asked):'');
+    const q=qs.find(x=>x.id===id);
+    if(!q) return {act:id, asked};
+    me(q.me); tick(q.sec||22);
+    await type('caller',who,q.a(asked));
+    asked.push(id);
+    if(onAsked){ const r=await onAsked(asked); if(r==='hangup'){ qs.length=0; } }
+  }
+}
+function card(left,right,cls){ const d=document.createElement('div'); d.className='card'+(cls?' '+cls:''); d.innerHTML='<span><b>'+left+'</b></span><span>'+right+'</span>'; pane.appendChild(d); }
+function beginCall(meta){
+  S.cur={night:S.night, id:meta.id, title:meta.title, time:clockStr(S.t).slice(0,5), num:meta.num, lines:[], truth:meta.truth};
+  pane.innerHTML=''; card((meta.line||'L1')+' · '+clockStr(S.t), meta.num); scrollDown();
+}
+function waitManual(){ if(S.manualSeen) return Promise.resolve(); return new Promise(res=>{ S.manualGate=res; menu([{id:'m',k:'매뉴얼',t:'상단 탭에서 매뉴얼을 연다',act:true,disabled:true}],'윤 주임: 매뉴얼 2. 읽고 물어.'); }); }
+function endCall(extra){ if(S.cur){ Object.assign(S.cur,extra||{}); S.rec.push(S.cur); S.cur=null; } }
+function drawArchive(){
+  const box=$('#arcBody');
+  const items=S.rec.filter(r=>r.night<S.night&&r.id!=='s4');
+  if(!items.length){ box.innerHTML='<div class="empty">보관된 녹취가 없습니다.<br>녹취는 근무가 끝난 뒤 보관함에 들어갑니다.</div>'; return; }
+  box.innerHTML=items.map((r,i)=>'<div class="item" data-i="'+i+'"><div class="h"><span>밤 '+r.night+' · '+r.time+' · '+r.title+'</span><small>'+r.num+'</small></div><div class="body">'+
+    r.lines.filter(l=>l.cls!=='sys').map(l=>'<div class="msg '+l.cls+'" style="font-size:13px">'+(l.who?'<span class="who">'+l.who+'</span>':'')+l.html+'</div>').join('')+'</div></div>').join('');
+  box.querySelectorAll('.item').forEach(el=>el.onclick=()=>el.classList.toggle('open'));
+}
+
+/* ================= 1인칭 뷰 (코드로 그린다) ================= */
+function hud(o2,label){ return '<g font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#E4552B">'+
+  '<rect x="22" y="18" width="120" height="8" fill="none" stroke="#E4552B" stroke-width="1"/>'+
+  '<rect x="23" y="19" width="'+Math.max(0,Math.min(118,o2/30*118))+'" height="6" fill="#E4552B" opacity=".85"/>'+
+  '<text x="150" y="26">SCBA '+o2+'분</text>'+(label?'<text x="598" y="26" text-anchor="end" fill="#b06a4a">'+label+'</text>':'')+'</g>'; }
+const MASK='<defs><radialGradient id="mk" cx="50%" cy="52%" r="62%"><stop offset="62%" stop-color="#000" stop-opacity="0"/><stop offset="88%" stop-color="#000" stop-opacity=".85"/><stop offset="100%" stop-color="#000"/></radialGradient></defs><rect width="620" height="300" fill="url(#mk)"/>'+
+  '<path d="M0 0 H620 V300 H0 Z M40 40 Q310 10 580 40 Q610 150 580 260 Q310 290 40 260 Q10 150 40 40 Z" fill="#000" fill-rule="evenodd" opacity=".95"/>';
+function smokeBand(y,h,op){ return '<defs><linearGradient id="sm'+y+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a8582" stop-opacity="'+op+'"/><stop offset="1" stop-color="#8a8582" stop-opacity="0"/></linearGradient></defs><rect x="0" y="'+y+'" width="620" height="'+h+'" fill="url(#sm'+y+')"/>'; }
+function setView(beat,o){
+  o=o||{}; const v=$('#view'); let g='';
+  if(beat==='arrive'){
+    g='<rect width="620" height="300" fill="#0a0b12"/>';
+    for(let i=0;i<60;i++) g+='<circle cx="'+((i*97)%620)+'" cy="'+((i*53)%120)+'" r="0.8" fill="#cdd" opacity=".5"/>';
+    g+='<rect x="150" y="60" width="320" height="240" fill="#14161c"/>';
+    for(let r=0;r<6;r++) for(let c=0;c<6;c++){ const on=(r*7+c)%5===0; g+='<rect x="'+(170+c*50)+'" y="'+(72+r*38)+'" width="30" height="22" fill="'+(on?'#3a3320':'#0c0d10')+'"/>'; }
+    g+='<rect x="'+(170+2*50)+'" y="'+(72+3*38)+'" width="30" height="22" fill="#2a1a12"/><rect x="'+(170+2*50)+'" y="'+(72+3*38)+'" width="30" height="22" fill="#e4552b" opacity=".25"/>';
+    g+='<ellipse cx="285" cy="'+(72+3*38-10)+'" rx="40" ry="22" fill="#777" opacity=".35"/><ellipse cx="300" cy="'+(72+3*38-40)+'" rx="60" ry="28" fill="#777" opacity=".2"/>';
+    g+='<text x="300" y="295" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#5a5f60" text-anchor="middle">3동</text>';
+    g+='<defs><radialGradient id="rl"><stop offset="0" stop-color="#e4552b" stop-opacity=".55"/><stop offset="1" stop-color="#e4552b" stop-opacity="0"/></radialGradient></defs><circle cx="40" cy="290" r="130" fill="url(#rl)"><animate attributeName="opacity" values="1;.2;1" dur="1.1s" repeatCount="indefinite"/></circle>';
+    g+=hud(o.o2||30,'현대아파트 3동 앞');
+  } else if(beat==='door'){
+    g='<rect width="620" height="300" fill="#100c0a"/>';
+    g+='<path d="M0 300 L220 120 L400 120 L620 300 Z" fill="#17120f"/><path d="M0 0 L220 120 L400 120 L620 0 Z" fill="#0b0908"/>';
+    g+='<line x1="0" y1="300" x2="220" y2="120" stroke="#2a2018"/><line x1="620" y1="300" x2="400" y2="120" stroke="#2a2018"/>';
+    g+='<rect x="268" y="138" width="84" height="150" fill="#241a14" stroke="#3a2a20"/><rect x="330" y="212" width="8" height="3" fill="#8a7a60"/>';
+    g+='<text x="310" y="130" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#9a8a70" text-anchor="middle">301</text>';
+    g+='<rect x="268" y="286" width="84" height="4" fill="#555" opacity=".7"/>';
+    g+=smokeBand(0,140,o.smoke||.75);
+    g+='<defs><radialGradient id="fl" cx="50%" cy="70%" r="45%"><stop offset="0" stop-color="#ffe8b0" stop-opacity=".22"/><stop offset="1" stop-color="#ffe8b0" stop-opacity="0"/></radialGradient></defs><rect width="620" height="300" fill="url(#fl)"/>';
+    g+=MASK+hud(o.o2||28,'3층 복도 · 301호');
+  } else if(beat==='inside'||beat==='found'){
+    g='<rect width="620" height="300" fill="#050403"/>';
+    g+='<defs><radialGradient id="fl2" cx="50%" cy="62%" r="'+(beat==='found'?'46%':'38%')+'"><stop offset="0" stop-color="#e8d8a8" stop-opacity=".28"/><stop offset="1" stop-color="#e8d8a8" stop-opacity="0"/></radialGradient></defs><rect width="620" height="300" fill="url(#fl2)"/>';
+    for(let i=0;i<7;i++) g+='<line x1="'+(40+i*90)+'" y1="300" x2="'+(250+i*20)+'" y2="170" stroke="#2a2420" stroke-width="1" opacity=".5"/>';
+    if(beat==='found'){ g+='<ellipse cx="330" cy="238" rx="120" ry="26" fill="#1a1410"/><ellipse cx="250" cy="226" rx="20" ry="16" fill="#221a14"/>';
+      if(o.towel) g+='<rect x="380" y="190" width="90" height="8" fill="#6a7a80" opacity=".7"/>'; }
+    g+=smokeBand(0,(o.low?120:190),.9)+'<rect width="620" height="300" fill="#6a6560" opacity="'+(o.low?.15:.35)+'"/>';
+    g+=MASK+hud(o.o2||26,beat==='found'?'요구조자':(o.room||'시야 0'));
+  } else if(beat==='out'){
+    g='<rect width="620" height="300" fill="#0a0b12"/><rect x="0" y="200" width="620" height="100" fill="#101214"/>';
+    g+='<defs><radialGradient id="rl2"><stop offset="0" stop-color="#e4552b" stop-opacity=".5"/><stop offset="1" stop-color="#e4552b" stop-opacity="0"/></radialGradient></defs><circle cx="520" cy="230" r="160" fill="url(#rl2)"><animate attributeName="opacity" values="1;.3;1" dur="1.1s" repeatCount="indefinite"/></circle>';
+    g+='<rect x="440" y="170" width="150" height="70" fill="#d8e0e0"/><rect x="450" y="180" width="40" height="30" fill="#334"/>';
+    g+='<defs><radialGradient id="air" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#9ac" stop-opacity=".12"/><stop offset="1" stop-color="#9ac" stop-opacity="0"/></radialGradient></defs><rect width="620" height="300" fill="url(#air)"/>';
+    g+=hud(o.o2||12,'밖 · 공기');
+  } else if(beat==='stair'){
+    g='<rect width="620" height="300" fill="#0c0a09"/>';
+    for(let i=0;i<6;i++) g+='<rect x="'+(160+i*20)+'" y="'+(260-i*34)+'" width="'+(300-i*40)+'" height="14" fill="#1c1714"/>';
+    g+=smokeBand(0,110,.6)+MASK+hud(o.o2||30,'계단참 · 대기');
+  }
+  v.innerHTML='<svg viewBox="0 0 620 300" preserveAspectRatio="xMidYMid slice">'+g+'</svg>';
+}
+function flashView(){ const v=$('#view'); v.classList.remove('flash'); void v.offsetWidth; v.classList.add('flash'); }
+
+/* ================= 밤 1 ================= */
+async function call1(){
+  jumpTo(22,14,5);
+  beginCall({id:'c1', title:'성당 뒤 주택 화재', num:'010-****-4410', truth:'화재 (주택 지붕)'});
+  setLine('l1','live'); sfx.ring();
+  sys('22:14:05 · L1 수신 — 발신 010-****-4410');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','여보세요!! 불이요 불! 옆집 지붕에서 불이 나요!');
+  await yun('위치부터.'); await wait(300); await yun('매뉴얼 2. 읽고 물어.');
+  await waitManual();
+  const qs=[
+    {id:'where', t:'어디입니까?', me:'어디입니까? 주소 말씀해 주세요.', a:()=>'남천동… 성당 있잖아요 성당! 성당 뒤 골목이요. 주소는… 몰라요, 파란 대문 집이요! 2층짜리!'},
+    {id:'fire', t:'불꽃이 보입니까, 연기입니까?', me:'불꽃이 보입니까? 어디서요?', a:()=>'지붕이요! 지붕에서 불꽃이 올라와요. 연기가 시꺼매요. (멀리서 뭔가 무너지는 소리)'},
+    {id:'people', t:'안에 사람이 있습니까?', me:'그 집에 사람이 있습니까? 대피했습니까?', a:()=>'할머니 한 분 사시는데… 나오셨는지 모르겠어요! 문 두드려 볼게요!'},
+    {id:'who', t:'신고자분은 누구십니까?', me:'신고자분 성함과, 그 집과 어떤 관계십니까?', a:()=>'옆집이요! 김동식이요. 아 빨리요!'},
+  ];
+  const r=await converse('신고자', qs,
+    a=>[{id:'go', k:'출동', t:'1팀 출동 — 성당 뒤 주택', act:true, disabled:!a.includes('where')}],
+    a=>a.includes('where')?'위치 확인 · 상황 · 인명':'매뉴얼 2 — 위치 먼저');
+  sfx.stamp();
+  me('1팀, 남천동 성당 뒤 2층 주택 지붕 화재. '+(r.asked.includes('people')?'거주자 70대 여성 1명, 대피 미확인. ':'')+'출동. 사륙?');
+  S.teams.pump.busy=25*60; tick(8); L.byeot.runs++;
+  radio('차수호','사칠. 1팀 출동.');
+  await wait(600);
+  radio('임볕','(숨소리) …1팀 후속, 출동합니다.');
+  if(!r.asked.includes('people')) await yun('인명 안 물었어. 지령에 없으면 현장이 모른다.');
+  me('소방차 출동시켰습니다. 저희가 전화할 수 있으니 모르는 번호로 와도 꼭 받아주세요. 할머니 나오시면 바로 알려 주세요.');
+  tick(20);
+  await type('caller','신고자','나오셨어요! 나오셨어요 할머니! (멀리서 사이렌)');
+  sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+  endCall({judge:'1팀 출동', result:'정상'});
+  tick(4*60);
+  radio('차수호','1팀 현장 도착. 2층 주택 지붕 화염. 거주자 대피 확인. 방수 개시.');
+  tick(6*60);
+  radio('차수호','초진.');
+  await yun('첫 건 끝났어. 다음부턴 내가 안 봐.');
+  tick(9*60);
+  radio('차수호','완진. 잔화 정리 후 복귀.');
+}
+
+async function call2(){
+  jumpTo(22,40,30);
+  beginCall({id:'c2', title:'"불났어" 주취자', num:'010-****-2201', truth:'비긴급 (고기 굽는 연기)'});
+  setLine('l1','live'); sfx.ring();
+  sys('22:40:30 · L1 수신 — 발신 010-****-2201');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','어… 여기 불났어. 불. (TV 소리) 아 진짜라니까? 불났다고.');
+  const qs=[
+    {id:'where', t:'어디입니까?', me:'어디입니까? 주소 말씀해 주세요.', a:()=>'몰라 그냥 와. 우리 집. (웃음소리) 야 조용히 해 봐, 119야.'},
+    {id:'fire', t:'불꽃이 보입니까, 연기입니까?', me:'불꽃이 보입니까, 연기입니까?', a:()=>'연기가… 고기 굽는데 연기가 막… (잠깐) 아니 불이야 불. 고기가 타.'},
+    {id:'who', t:'성함을 말씀해 주세요', me:'신고자 성함을 말씀해 주십시오.', a:()=>'나? 나 김철수… 아니 박철수. (웃음) 왜, 잡아가게?'},
+  ];
+  const r=await converse('신고자', qs,
+    a=>[
+      {id:'hold', k:'분류', t:'비긴급 — 안내 후 종료', act:true},
+      {id:'go', k:'분류', t:'잠재긴급 — 1팀 확인 출동', act:true, disabled:S.teams.pump.busy>0},
+      {id:'police', k:'공동', t:'경찰 공동대응 요청 (주취)', act:true},
+    ], a=>'매뉴얼 4 — 3단계 분류');
+  L.c2=r.act;
+  if(r.act==='go'){
+    sfx.stamp(); me('1팀, 신고자 위치 미상 — 발신 기지국 남천동 2가. 연기 신고, 주취 추정. 확인 출동. 사륙?');
+    S.teams.pump.busy=25*60; tick(8); L.byeot.runs++; L.byeot.wasted++;
+    radio('차수호','사칠. …위치가 없는데요.');
+    me('기지국 반경입니다. 현장에서 확인 바랍니다.');
+    sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+    tick(7*60);
+    radio('차수호','1팀 현장 도착. 화재 없음. 주취자 1명, 삼겹살. 복귀합니다.');
+    await yun('…삼겹살.'); L.trust--;
+  } else if(r.act==='police'){
+    me('경찰 공동대응 요청하겠습니다. 불이 보이면 바로 다시 전화 주세요.'); tick(10);
+    sfx.hangup(); sys('L1 통화 종료 — 112 공동대응 이관'); setLine('l1','');
+    await yun('…경찰이 고마워하겠네.');
+  } else {
+    me('화재 징후가 확인되지 않아 비긴급으로 분류합니다. 불꽃이 보이면 즉시 다시 119로 전화 주세요.'); tick(8);
+    await type('caller','신고자','어 그래… (웃음) 고기 먹으러 올래?');
+    sfx.hangup(); sys('L1 통화 종료 — 비긴급'); setLine('l1','');
+  }
+  endCall({judge:{hold:'비긴급',go:'1팀 확인 출동',police:'경찰 이관'}[r.act], result:r.act==='go'?'헛걸음':'정상'});
+}
+
+async function call3(){
+  jumpTo(23,5,10); S.l2wait=null;
+  beginCall({id:'c3', title:'남천중 체육관 화재 신고', num:'010-****-3317', truth:'허위 (중학생 3명, 연습한 장난)'});
+  setLine('l1','live'); sfx.ring();
+  sys('23:05:10 · L1 수신 — 발신 010-****-3317');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','여보세요, 불이요. 남천중학교 뒤쪽 체육관에서 불이 나요. (바람 소리) 연기가 엄청 나요.');
+  let hung=false;
+  const qs=[
+    {id:'where', t:'어디서 전화하시는 겁니까?', me:'지금 어디서 전화하시는 겁니까?', a:()=>'남천중학교요, 운동장 앞이요. 체육관 쪽에서 나요. (바람 소리)'},
+    {id:'fire', t:'불꽃이 보입니까, 연기입니까?', me:'불꽃이 보입니까, 연기입니까? 어느 쪽에서요?', sec:24, a:()=>'연기요… 위쪽 창문에서요. 2층… 아, 체육관은 1층이죠. 위쪽 창문이요.'},
+    {id:'people', t:'안에 사람이 있습니까?', me:'학교 안에 사람이 있습니까?', sec:20, a:()=>'(잠깐 멈춤) 경비 아저씨 계실 건데… 모르겠어요.'},
+    {id:'why', t:'이 시간에 거기서 뭐 하고 계셨어요?', me:'이 시간에 학교 앞에서 뭐 하고 계셨습니까?', sec:18, a:()=>'어… 친구들이랑 농구요. (뒤에서 누가 뭐라고 한다) 아니, 지나가다가요.'},
+    {id:'name', t:'성함과 연락처를 말씀해 주세요', me:'신고자 성함과 연락처를 말씀해 주십시오.', sec:18, a:()=>'박준호요. 이 번호로 하시면 돼요.'},
+  ];
+  const r=await converse('신고자', qs,
+    a=>[
+      {id:'pump', k:'출동', t:'1팀 출동 지령 — 남천중 체육관', act:true, disabled:S.teams.pump.busy>0},
+      {id:'amb', k:'확인', t:'구급 1대만 확인 출동', act:true, disabled:S.teams.amb.busy>0},
+      {id:'hold', k:'보류', t:hung?'허위 판단 — 기록 후 종료':'허위 의심 — 보류 후 재접수 대기', act:true},
+    ],
+    a=>hung?'상대가 끊었다. 판단은 남아 있다':(a.length?'질문 '+a.length+'회 · 매뉴얼 3·4':'위치 → 상황 → 인명'),
+    async a=>{
+      if(a.length===2&&!S.l2wait){ S.l2wait=S.t; setLine('l2','wait'); sys('L2 수신 대기 — 발신 010-****-0082'); }
+      if(a.length>=3){ await wait(500);
+        await type('caller','신고자','(수화기 너머, 아주 작게 다른 목소리: "야, 됐어") …저 가봐야 돼요. 빨리 와주세요.');
+        sfx.hangup(); sys('L1 통화 종료 — 상대방 끊음'); setLine('l1',''); hung=true; return 'hangup'; }
+    });
+  L.c3=r.act; L.c3asked=r.asked; setLine('l1','');
+  if(r.act==='pump'){
+    sfx.stamp(); me('1팀, 남천중학교 체육관 화재. 신고자 운동장 앞. 출동. 사륙?');
+    S.teams.pump.busy=25*60; tick(8); L.byeot.runs++; L.byeot.wasted++;
+    radio('차수호','사칠. 1팀 출동, 남천중 방면.');
+    await wait(500);
+    await yun('학교야. 보고 대상이다. 최초보고 양식 띄워.');
+  } else if(r.act==='amb'){
+    sfx.stamp(); me('구급 1, 남천중 체육관. 현장 확인 출동. 사륙?');
+    S.teams.amb.busy=25*60; tick(8);
+    radio('구급 1','사칠. 구급 1, 남천중으로 이동.');
+  } else {
+    me('허위 의심. 보류 기록.'); tick(6);
+    await yun('…3번 조항, 알지. 네 판단이야. 받아.');
+  }
+  endCall({judge:{pump:'1팀 출동',amb:'구급 확인 출동',hold:'보류'}[r.act], result:r.act==='hold'?'정답(규정 예외)':'헛걸음'});
+  drawTeams(); await wait(500);
+}
+
+function leak(n){ if(n===2) return ' (말끝에 작게 기침)'; if(n>=3) return ' (기침) 어… 방이 좀 뿌연 것 같기도 하고…'; return ''; }
+async function call4(){
+  S.phase='c4';
+  L.c4.waited = S.l2wait ? (S.t-S.l2wait) : 0;
+  beginCall({id:'c4', line:'L2', title:'현대아파트 301호', num:'010-****-0082', truth:'화재 (주방 발화, 연기 흡입)'});
+  setLine('l2','live'); sfx.ring();
+  sys(clockStr(S.t)+' · L2 연결 — 대기 '+Math.round(L.c4.waited)+'초');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','여보세요… 거기 119 맞죠. 밤늦게 미안한데요… 냄새가 나서요.');
+  const p=S.teams.pump, am=S.teams.amb;
+  let n=0;
+  const qs=[
+    {id:'where', t:'지금 계신 곳이 어디입니까?', me:'지금 계신 곳이 어디입니까? 동, 호수 말씀해 주세요.', sec:26, a:a=>'현대아파트… 3동 301호요. 아니, 302… (한참) 301호 맞아요. 3동.'+leak(a.length+1)},
+    {id:'smell', t:'무슨 냄새입니까? 불이 보입니까?', me:'무슨 냄새입니까? 불꽃이나 연기가 보입니까?', sec:22, a:a=>'타는 냄새요. 옆집인가 싶어서요… 불은 안 보여요. 괜히 전화했나 모르겠네.'+leak(a.length+1)},
+    {id:'alone', t:'혼자 계십니까?', me:'집에 혼자 계십니까?', sec:16, a:a=>'네… 혼자요. 딸은 서울에 있고…'+leak(a.length+1)},
+    {id:'door', t:'현관문 쪽은 어떻습니까?', me:'현관문 쪽으로 가 보시겠어요? 손등으로 손잡이를 대 보세요. 손바닥 말고 손등이요.', sec:30, when:a=>a.length>=1, a:()=>'(한참) (기침) 어… 문 쪽이 뿌옇네요… (기침) 손잡이가, 뜨거워요.'},
+  ];
+  let guided=false;
+  const r=await converse('신고자', qs,
+    a=>{ const acts=[];
+      if(!guided) acts.push({id:'guide', k:'안내', t:'젖은 수건으로 문틈을 막고, 낮게 엎드리세요', act:true});
+      if(a.includes('where')){
+        acts.push({id:'pump', k:'출동', t:(p.busy>0?'1팀 — 출동 중 (복귀 '+Math.ceil(p.busy/60)+'분)':'1팀 출동 — 현대아파트 3동'), act:true, disabled:p.busy>0});
+        acts.push({id:'rescue', k:'출동', t:'구조대 출동 — 현대아파트 3동', act:true});
+        acts.push({id:'amb', k:'확인', t:(am.busy>0?'구급 — 출동 중':'구급 1대만 확인 출동'), act:true, disabled:am.busy>0});
+        acts.push({id:'hold', k:'분류', t:'비긴급 — 관리사무소 확인 요청 후 종료', act:true});
+      } else acts.push({id:'x', k:'출동', t:'출동 지령 — 위치 미확인', act:true, disabled:true});
+      return acts; },
+    a=>a.includes('where')?'위치 확인됨 · 질문 '+a.length+'회':'매뉴얼 2 — 위치 먼저',
+    null);
+  // 안내는 행동이지만 통화는 계속된다
+  let act=r.act, asked=r.asked;
+  while(act==='guide'){
+    guided=true; L.c4.guided=true;
+    me('할머니, 제 말 들리세요. 수건을 물에 적셔서 문틈을 막으세요. 그리고 바닥에 낮게 엎드리세요. 연기는 위로 갑니다.');
+    tick(34);
+    await type('caller','신고자','수건… 네… (물 소리) (한참) 했어요… 엎드렸어요.');
+    me('잘하셨어요. 끊지 마세요. 계속 말씀하세요.');
+    const r2=await converse('신고자', qs.filter(q=>!asked.includes(q.id)),
+      a=>{ const acts=[]; const all=[...asked,...a];
+        if(all.includes('where')){
+          acts.push({id:'pump', k:'출동', t:(p.busy>0?'1팀 — 출동 중 (복귀 '+Math.ceil(p.busy/60)+'분)':'1팀 출동 — 현대아파트 3동'), act:true, disabled:p.busy>0});
+          acts.push({id:'rescue', k:'출동', t:'구조대 출동 — 현대아파트 3동', act:true});
+          acts.push({id:'amb', k:'확인', t:(am.busy>0?'구급 — 출동 중':'구급 1대만 확인 출동'), act:true, disabled:am.busy>0});
+          acts.push({id:'hold', k:'분류', t:'비긴급 — 관리사무소 확인 요청 후 종료', act:true});
+        } else acts.push({id:'x', k:'출동', t:'출동 지령 — 위치 미확인', act:true, disabled:true});
+        return acts; },
+      a=>'위치 확인됨 · 질문 '+(asked.length+a.length)+'회', null);
+    act=r2.act; asked=[...asked,...r2.asked];
+  }
+  L.c4.asked=asked; L.c4.team=act; n=asked.length;
+  if(act==='hold'){
+    L.c4.held=true;
+    me('연기가 보이지는 않으시는 거죠. 관리사무소에 확인 요청해 두겠습니다. 냄새가 심해지거나 연기가 보이면 즉시 다시 119 눌러 주세요.'); tick(10);
+    await type('caller','신고자','네… 미안해요, 밤늦게.');
+    sfx.hangup(); sys('L2 통화 종료 — 비긴급'); setLine('l2','');
+    endCall({judge:'비긴급 분류', result:'오분류'});
+    await wait(900); tick(11*60);
+    beginCall({id:'c4b', title:'현대아파트 3동 — 이웃 신고', num:'010-****-5561', truth:'화재'});
+    setLine('l1','live'); sfx.ring();
+    sys(clockStr(S.t)+' · L1 수신 — 발신 010-****-5561');
+    me('남천 119입니다.');
+    await type('caller','신고자','(다급하게) 3동 301호에서 연기가 막 나와요! 복도가 다 뿌예요! 창문으로 불꽃 보여요!');
+    const team = p.busy>0 ? 'rescue' : 'pump';
+    sfx.stamp(); me((team==='pump'?'1팀':'구조대')+', 현대아파트 3동 301호. 화재. 요구조자 1명 추정. 출동. 사륙?');
+    S.teams[team].busy=25*60; tick(8); if(team==='pump') L.byeot.runs++;
+    radio(team==='pump'?'차수호':'한이레','사칠. '+(team==='pump'?'1팀':'구조대')+' 출동. 3동.'+(team==='pump'?' 6분.':' 9분.'));
+    setLine('l1',''); drawTeams();
+    endCall({judge:'출동', result:'11분 지연'});
+    L.c4.team=team; L.c4.late=true;
+    await scene4(team);
+    return;
+  }
+  setLine('l2',''); sfx.stamp();
+  if(act==='pump'){
+    me('1팀, 현대아파트 3동 301호. 연기 냄새 신고, 70대 여성 단독 거주, 현관문 개방 불가. 출동. 사륙?');
+    S.teams.pump.busy=25*60; tick(6); L.byeot.runs++;
+    radio('차수호','사칠. 1팀 출동, 현대아파트 3동. 6분.');
+  } else if(act==='rescue'){
+    me('구조대, 현대아파트 3동 301호. 70대 여성 단독 거주, 연기 냄새, 현관문 개방 불가. 출동. 사륙?');
+    S.teams.rescue.busy=25*60; tick(6);
+    radio('한이레','사칠. 구조대 출동. 몇 명이에요?');
+    me('1명. 70대 여성. 혼자.');
+    radio('한이레','알겠어요. 9분.');
+  } else {
+    me('구급 1, 현대아파트 3동 301호. 확인 출동. 사륙?');
+    S.teams.amb.busy=25*60; tick(6);
+    radio('구급 1','사칠. 구급 1 이동. 8분.');
+  }
+  drawTeams();
+  me('할머니, 소방차 출동시켰습니다. 끊지 마시고요. 모르는 번호로 전화 오면 저희니까 꼭 받으세요.');
+  endCall({judge:{pump:'1팀 출동',rescue:'구조대 출동',amb:'구급 확인 출동'}[act], result:'→ 현장'});
+  await scene4(act);
+}
+
+/* ── 2막: 현장 — 내가 보낸 사람이 된다 ── */
+async function scene4(team){
+  const late=!!L.c4.late;
+  const who = team==='pump' ? '임볕 · 1팀' : team==='rescue' ? '한이레 · 구조대' : '구급 1';
+  const name = team==='pump' ? '임볕' : team==='rescue' ? '한이레' : '구급대원';
+  await wait(900);
+  pane.innerHTML=''; card('시점 전환 — '+who, '현대아파트 3동', 'scene'); setPov(who); setView('arrive',{o2:30});
+  const eta = team==='pump'?6 : team==='rescue'?9 : 8;
+  tick(eta*60-60);
+  sys(clockStr(S.t)+' · '+(team==='pump'?'펌프차':team==='rescue'?'구조공작차':'구급차')+' — 현대아파트 3동 앞');
+  if(team==='pump') await nar('차수호 반장이 먼저 내린다. 뒤따라 내리는데 공기호흡기 어깨끈이 걸린다. 3층 창문 하나가 잿빛이다. 유리 안쪽으로 연기가 천천히 구른다.');
+  else if(team==='rescue') await nar('도강이 파괴기를 집는다. 3층 창문이 잿빛이다. 나는 상황실이 말한 것을 되뇐다 — 70대 여성, 혼자, 현관문 개방 불가.'+(L.c4.guided?' 젖은 수건.':''));
+  else await nar('구급차에서 내린다. 3층 창문이 잿빛이다. 우리는 진입 장비가 없다. 펌프를 부를 시간이다.');
+  if(team==='amb'){
+    tick(40);
+    await menu([{id:'call',k:'무전',t:'상황실 — 펌프 지원 요청',act:true}],'구급은 진입하지 않는다');
+    radio('구급 1','구급 1 현장 도착. 3층 복도 농연, 진입 불가. 펌프 지원 요청합니다.');
+    tick(90);
+    const t2 = S.teams.pump.busy>0?'rescue':'pump'; S.teams[t2].busy=25*60; drawTeams();
+    setView('stair',{o2:30}); await nar('계단참에 앉아 기다린다. 위에서 연기가 내려온다. 2분이 아주 길다.');
+    radio(t2==='pump'?'차수호':'한이레',(t2==='pump'?'1팀':'구조대')+' 현장 도착. 301호 진입, 인명검색.');
+    tick(120);
+    await finishScene(team, 0);
+    return;
+  }
+  // 1) 현관
+  tick(50);
+  setView('door',{o2:28}); await nar('3층. 복도 천장에 연기가 층을 이루고 있다. 301호. 손등을 문에 댄다.'+(L.c4.asked.includes('door')?' 뜨겁다. 상황실이 말한 대로다.':' 뜨겁다.'));
+  sys('공기호흡기 잔량 — 28분');
+  const d1=await menu([
+    {id:'gas', k:'확인', t:'가스탐지기 확인 후 파괴 개방 (SOP 213)', act:true},
+    {id:'break', k:'진입', t:'즉시 파괴 개방', act:true},
+    {id:'radio', k:'무전', t:'상황실 — 관리사무소 가스 차단 여부 확인', act:true},
+  ],'문이 뜨겁다');
+  L.scene.gas=d1;
+  let mod=0;
+  if(d1==='gas'){ tick(40); await nar('탐지기를 문틈에 댄다. 수치가 오르지 않는다. '+(team==='pump'?'차수호가 고개를 끄덕인다.':'도강이 파괴기를 든다.')+' 쾅. 쾅. 문이 안으로 꺾인다.'); sfx.crack(); }
+  else if(d1==='break'){ tick(15); sfx.crack(); flashView(); await nar('쾅. 쾅. 문이 꺾이는 순간 안쪽 공기가 한 번 빨려 들어갔다가 — 화악. 열기가 얼굴을 친다. 눈썹이 따갑다. 백드래프트는 아니었다. 아니었을 뿐이다.'); L.scene.burn=true; }
+  else { tick(70); radio(name,(team==='pump'?'1팀':'구조대')+' 301호 앞. 상황실, 3동 가스 차단 확인 바람.'); await wait(400); radio('상황실','관리사무소 연결 중… 가스 차단 완료. 진입하세요.'); await nar('70초. 문 너머에서 아무 소리도 나지 않는다. 쾅. 쾅.'); sfx.crack(); mod+=1; }
+  // 2) 진입 · 인명검색
+  tick(30);
+  sys('공기호흡기 잔량 — '+(d1==='radio'?'24분':'26분')); setView('inside',{o2:d1==='radio'?24:26});
+  await nar('시야가 없다. 연기가 바닥에서 한 뼘 위까지 내려와 있다. 무릎으로 기어 들어간다. 왼손은 벽, 오른손은 앞.'+(L.c4.guided?' 어디선가 — 톡. 톡. 뭔가를 두드리는 소리.':' 아무 소리도 없다.'));
+  const rooms=[
+    {id:'bed', k:'검색', t:'왼쪽 — 안방', act:true},
+    {id:'kitchen', k:'검색', t:'앞 — 주방 (열기가 세다)', act:true},
+    {id:'bath', k:'검색', t:'오른쪽 — 화장실', act:true},
+  ];
+  if(L.c4.guided) rooms.unshift({id:'sound', k:'검색', t:'소리 나는 쪽으로', act:true});
+  const d2=await menu(rooms, L.c4.asked.includes('alone')?'요구조자 1명':'요구조자 수 미상');
+  L.scene.room=d2;
+  if(d2==='sound'||d2==='bed'){ tick(40); setView('found',{o2:18-mod*4,towel:L.c4.guided,low:L.c4.guided}); await nar(d2==='sound'?'소리를 따라 왼쪽. 문틀 아래 — 젖은 수건이 틈을 막고 있다. 그 안쪽, 바닥에 엎드린 사람. 손에 숟가락을 쥐고 바닥을 두드리고 있다.':'안방. 바닥을 더듬는다. 이불. 다리. 사람이다.'+(L.c4.guided?' 문틈에 수건이 있었다.':'')); }
+  else if(d2==='kitchen'){ tick(60); setView('inside',{o2:22,room:'주방 · 열기'}); await nar('주방. 열기가 마스크 안까지 들어온다. 가스레인지 옆 벽이 타고 있다. 여기에는 아무도 없다. 돌아 나온다. 40초를 버렸다.'); mod+=1;
+    tick(40); setView('found',{o2:18-mod*4,towel:L.c4.guided,low:L.c4.guided}); await nar('안방. 바닥을 더듬는다. 이불. 다리. 사람이다.'); }
+  else { tick(45); setView('inside',{o2:22,room:'화장실'}); await nar('화장실. 타일이 차갑다. 비어 있다. 돌아 나온다.'); mod+=1;
+    tick(40); setView('found',{o2:18-mod*4,towel:L.c4.guided,low:L.c4.guided}); await nar('안방. 바닥을 더듬는다. 이불. 다리. 사람이다.'); }
+  // 3) 상태 · 반출
+  const tier=Math.min(3, (team==='pump'?0:1) + (late?1:0) + (L.c4.guided?0:1) + ((L.c4.asked.length>=3&&!late)||L.c4.waited>=75?1:0) + (S.teams.amb.busy>0&&L.c3==='amb'?1:0) + mod);
+  L.c4.tier=tier;
+  sys('공기호흡기 잔량 — '+(18-mod*4)+'분');
+  const st=['손을 잡는다. 잡아 온다. "할머니, 소방관입니다." 고개를 끄덕인다.','손을 잡는다. 느리게 쥔다. 눈을 뜨는데 초점이 없다.','손을 잡는다. 반응이 없다. 가슴이 오르내린다. 얕게.','손을 잡는다. 반응이 없다. 가슴이 — 오르내리지 않는다.'][tier];
+  await nar(st);
+  const d3=await menu([
+    {id:'carry', k:'반출', t:'업고 나간다', act:true},
+    {id:'waitamb', k:'대기', t:'구급 진입을 기다린다 — 복도에서', act:true, disabled:tier>=3},
+  ], tier>=3?'기다릴 시간이 없다':'잔량 '+(18-mod*4)+'분');
+  L.scene.carry=d3;
+  tick(d3==='carry'?70:120);
+  if(d3==='carry'){ setView('out',{o2:14-mod*4}); await nar('등에 업는다. 가볍다. 너무 가볍다. 복도. 계단. 2층. 1층. 밖. 공기.');
+  } else { setView('stair',{o2:12-mod*4}); await nar('복도 끝까지 끌고 나와 눕힌다. 구급이 계단을 올라온다. 넘긴다.'); }
+  await finishScene(team, tier);
+}
+async function finishScene(team, tier){
+  const who = team==='pump'?'임볕':team==='rescue'?'한이레':'구급 1';
+  const unit = team==='pump'?'1팀':team==='rescue'?'구조대':'구급 1';
+  const lines=[
+    '요구조자 1명 확보. 의식 명료. 문틈에 젖은 수건. 연기 흡입 경미 — 구급 인계. 주방 화재 초진.',
+    '요구조자 1명 확보. 의식 있음, 반응 느림. 연기 흡입 — 구급 인계, 중상. 주방 화재 초진.',
+    '요구조자 1명 확보. 의식 없음, 호흡 있음. 구급 인계 — 위중. 초진 중.',
+    '요구조자 1명 확보. 호흡 없음. 심폐소생 시작. … 구급 인계. 맥박 돌아왔습니다. 초진 중.'
+  ];
+  if(team==='amb'){ L.c4.tier=Math.min(3,2+(L.c4.guided?0:1)); }
+  const t=L.c4.tier;
+  await menu([{id:'rep',k:'무전',t:'상황실에 보고한다',act:true}],'내가 보고하는 쪽이다');
+  radio(who, unit+' — '+lines[t]);
+  tick(30);
+  await wait(700);
+  pane.innerHTML=''; card('상황실 복귀', clockStr(S.t)); setPov(null);
+  line('radio',null,'<span class="who">'+clockStr(S.t).slice(0,5)+' · '+who+'</span>'+unit+' — '+lines[t]);
+  if(L.scene.burn) radio('차수호','1팀 임볕, 안면 1도 화상. 구급 인계 후 복귀.');
+  if(L.c3==='pump'){
+    await wait(400);
+    radio('차수호','1팀 남천중 건 — 현장 화재 징후 없음, 문 잠겨 있음, 운동장에 아무도 없음. 복귀합니다.');
+    await yun('최초보고 취소해. 허위신고 과태료 건으로 올려. — 네 잘못은 아니야. 3번 조항대로 했어.'); L.fines++;
+  } else if(L.c3==='amb'){
+    await yun('화재 신고에 구급을 보냈어? 3번 조항은 펌프야.'); L.trust--;
+  } else {
+    await yun(t<=1?'다음.':(L.c4.held?'냄새가 난댔지. 비긴급으로 분류한 건 너야. 녹취 들을 거야.':'…다음.'));
+    if(L.c4.held) L.trust-=2;
+  }
+  S.rec.push({night:S.night, id:'s4', title:'현장 — '+unit+' 301호', time:clockStr(S.t).slice(0,5), num:'무전', lines:[], truth:'', judge:'', result:['경상','중상','위중','심정지→소생'][t]});
+}
+
+async function call5(){
+  jumpTo(0,30,40);
+  beginCall({id:'c5', title:'"옆집에서 탄내" 박만수', num:'010-****-7749', truth:'비긴급 (이번 달 6번째 신고)'});
+  setLine('l1','live'); sfx.ring();
+  sys('00:30:40 · L1 수신 — 발신 010-****-7749');
+  await yun('또 그 번호네. 매주 전화해. 이번 달 여섯 번째야. 끊어.');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','…119지요. (느리게) 옆집에서 탄내가 나는데. 또 나한테 뭐라 하지 마요.');
+  const qs=[
+    {id:'smell', t:'무슨 냄새입니까?', me:'무슨 냄새입니까? 연기가 보입니까?', a:()=>'탄내… 아니 고무 타는… 모르겠어. 나는 코가 잘… (한참) 안 보여. 안 보이는데 냄새가.'},
+    {id:'alone', t:'혼자 계십니까?', me:'집에 혼자 계십니까?', a:()=>'(한참) …혼자지. 아들은… 전화를 안 받아. 밤에는 더.'},
+    {id:'where', t:'어디십니까?', me:'어디십니까? 동, 호수요.', a:()=>'남천동 2가… 알잖아요. 맨날 같은 데. 골목 끝 집.'},
+  ];
+  const r=await converse('신고자', qs,
+    a=>[
+      {id:'listen', k:'듣기', t:'"말씀하세요." — 그냥 듣는다', act:true},
+      {id:'hold', k:'분류', t:'비긴급 — 안내 후 종료', act:true},
+      {id:'go', k:'분류', t:'잠재긴급 — 1팀 확인 출동', act:true, disabled:S.teams.pump.busy>0},
+    ], a=>'이번 달 6번째 · 매뉴얼 4');
+  L.manso=r.act;
+  if(r.act==='listen'){
+    me('말씀하세요. 듣고 있습니다.'); tick(40);
+    await type('caller','신고자','…아무도 안 와. 전화하면 오기는 오는데, 와서 나를 그렇게 봐. (한참) 냄새는 나. 진짜로. 근데 내가 말하면 아무도… (아주 작게) 미안해요. 또 괜히.');
+    tick(20);
+    sfx.hangup(); sys('L1 통화 종료 — 상대방 끊음'); setLine('l1','');
+    await yun('…2분 14초. 그동안 L2가 울렸으면 어쩔 뻔했어.'); L.trust--;
+  } else if(r.act==='go'){
+    sfx.stamp(); me('1팀, 남천동 2가 골목 끝 주택. 탄내 신고. 확인 출동. 사륙?');
+    S.teams.pump.busy=25*60; tick(8); L.byeot.runs++; L.byeot.wasted++;
+    radio('차수호','사칠. …박만수 씨 댁이죠.');
+    sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+    tick(8*60);
+    radio('차수호','1팀 현장 도착. 화재 없음. 옆집 빈집. 박만수 씨, 문 앞에 나와 계심. 복귀합니다.');
+    await yun('여섯 번째.'); L.trust-=2;
+  } else {
+    me('화재 징후가 확인되지 않아 비긴급으로 분류합니다. 연기가 보이면 즉시 다시 전화 주세요.'); tick(8);
+    await type('caller','신고자','…그래요. 알았어요.');
+    sfx.hangup(); sys('L1 통화 종료 — 비긴급'); setLine('l1','');
+  }
+  endCall({judge:{listen:'2분 14초 들음',hold:'비긴급',go:'1팀 확인 출동'}[r.act], result:r.act==='go'?'헛걸음':'정상'});
+}
+
+async function call6(){
+  jumpTo(3,12,0);
+  beginCall({id:'c6', title:'"40분 뒤 세탁소" 발신 제한', num:'발신번호 표시제한', truth:'?'});
+  setLine('l1','live'); sfx.ring();
+  sys('03:12:00 · L1 수신 — 발신번호 표시제한');
+  sys('(윤 주임이 시계를 본다)'); L.yunSawClock=true;
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','남천동 세탁소. 남천시장 입구 쪽, 파란 간판. 40분 뒤에 불이 납니다. (완전한 정적) 사람은 없을 겁니다.');
+  const qs=[
+    {id:'who', t:'누구십니까?', me:'누구십니까? 성함을 말씀해 주십시오.', a:()=>'이름은 중요하지 않습니다. 건물을 보세요.'},
+    {id:'how', t:'어떻게 아십니까?', me:'불이 날 거라는 걸 어떻게 아십니까?', a:()=>'…세탁기 뒤쪽 콘센트가 녹고 있어요. 플라스틱 냄새가 나요. 전에도 이랬어요.'},
+    {id:'there', t:'지금 거기 계십니까?', me:'지금 세탁소 앞에 계십니까?', a:()=>'(정적) 이제 갑니다.'},
+  ];
+  let hung=false;
+  const r=await converse('신고자', qs,
+    a=>[
+      {id:'police', k:'공동', t:'경찰 공동대응 요청 — 예고·협박성 (매뉴얼 7)', act:true},
+      {id:'patrol', k:'분류', t:'잠재긴급 — 1팀 순찰 출동', act:true, disabled:S.teams.pump.busy>0},
+      {id:'log', k:'기록', t:'기록만 하고 종료', act:true},
+    ], a=>'매뉴얼 7 — 예고성 신고',
+    async a=>{ if(a.length>=2){ await wait(400); await type('caller','신고자','(아주 작게, 혼잣말처럼) …사칠.'); sfx.hangup(); sys('L1 통화 종료 — 상대방 끊음'); setLine('l1',''); hung=true; return 'hangup'; } });
+  L.herald=r.act; setLine('l1','');
+  if(r.act==='patrol'){
+    sfx.stamp(); me('1팀, 남천시장 입구 세탁소. 전기 화재 예고 신고. 잠재긴급, 순찰 출동. 사륙?');
+    S.teams.pump.busy=25*60; tick(8); L.byeot.runs++;
+    radio('차수호','사칠. …예고요?');
+    me('콘센트 발열 신고로 접수합니다. 현장 확인 바랍니다.');
+  } else if(r.act==='police'){
+    me('경찰 공동대응 요청. 예고성 신고, 발신번호 제한.'); tick(10);
+  } else { me('기록. 발신 제한, 03:12, 세탁소.'); tick(6); }
+  const ask=await menu([{id:'askyun',k:'질문',t:'윤 주임에게 묻는다 — "아는 사람입니까?"',act:true},{id:'skip',k:'—',t:'묻지 않는다',act:true}],'윤 주임은 아직 시계를 보고 있다');
+  if(ask==='askyun'){ L.askedYun=true; await yun('…기록해.'); await wait(500); await yun('(그리고 더 말하지 않는다. 이번 밤에는.)'); }
+  endCall({judge:{police:'경찰 이관',patrol:'1팀 순찰 출동',log:'기록만'}[r.act], result:'—'});
+}
+
+async function call7(){
+  jumpTo(3,52,30);
+  beginCall({id:'c7', title:'남천시장 세탁소 화재', num:'010-****-9023', truth:'화재 (콘센트 발화)'});
+  setLine('l1','live'); sfx.ring();
+  sys('03:52:30 · L1 수신 — 발신 010-****-9023');
+  me('남천 119입니다.');
+  await type('caller','신고자','세탁소에서 연기 나요! 남천시장 입구! 셔터 틈으로 연기가 — 아 불꽃 보여요!');
+  if(L.herald==='patrol'){
+    radio('차수호','1팀 현장 인근 순찰 중. 세탁소 셔터 틈 연기 확인. 도착. 셔터 절단, 진입.');
+    tick(3*60);
+    radio('차수호','세탁기 뒤 콘센트 화재. 초진. 인명 없음. 확산 없음.');
+    L.c7='saved';
+    me('1팀이 현장에 있었습니다. 진화 중입니다. 감사합니다.');
+    sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+    await yun('…어떻게 알았어.'); await wait(600); await yun('(윤 주임이 03:12 기록을 연다. 오래 본다.)');
+  } else {
+    const team=S.teams.pump.busy>0?'rescue':'pump';
+    sfx.stamp(); me((team==='pump'?'1팀':'구조대')+', 남천시장 입구 세탁소. 셔터 화재, 인명 미상. 출동. 사륙?');
+    S.teams[team].busy=25*60; tick(8); if(team==='pump') L.byeot.runs++;
+    radio(team==='pump'?'차수호':'한이레','사칠. 출동.');
+    sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+    tick(7*60);
+    radio(team==='pump'?'차수호':'한이레','현장 도착. 세탁소 전면 화염. 인명 없음. 방수 개시.');
+    tick(20*60);
+    radio(team==='pump'?'차수호':'한이레','완진. 세탁소 전소. 인접 점포 연소 확대 없음.');
+    L.c7='burned';
+    await yun('(윤 주임이 03:12 기록을 연다. 오래 본다.)');
+    if(L.herald==='police'){ await wait(500); radio('상황실','경찰: 발신 제한 번호 추적 불가. 종결.'); }
+  }
+  endCall({judge:L.herald==='patrol'?'순찰 배치로 초기 진압':'출동', result:L.c7==='saved'?'초진':'전소'});
+}
+
+/* ================= 밤 종료 · 이월 ================= */
+function tierName(t){ return ['경상','중상','위중','심정지 → 소생'][t]; }
+function report1(){
+  S.phase='report'; beepLoop(false);
+  const c4=L.c4, t=c4.tier;
+  const rows=S.rec.filter(r=>r.night===1&&r.id!=='s4').map(r=>
+    '<tr><td>'+r.time+'</td><td>'+r.title+'<br><span class="truth">진실: '+(r.truth||'—')+'</span><br>판단: '+r.judge+' — <span class="'+(/헛걸음|오분류|지연/.test(r.result)?'bad':'good')+'">'+r.result+'</span></td></tr>').join('');
+  const sc=S.rec.find(r=>r.night===1&&r.id==='s4');
+  const replay3 = L.c3==='hold' ? '' :
+    '<h3>다시 듣기 — 23:05</h3><div class="replay">'+
+    (L.c3asked.includes('fire')?'<div><span class="t">0:46</span>"위쪽 창문에서요. <mark>2층… 아, 체육관은 1층이죠</mark>" — 현장에 있는 사람은 층수를 고치지 않는다</div>':'<div><span class="t">—</span>층수를 물었다면: 체육관 층수를 틀렸을 것이다</div>')+
+    (L.c3asked.includes('why')?'<div><span class="t">1:02</span>"친구들이랑 <mark>농구</mark>요 … 아니, <mark>지나가다가</mark>요" — 밤 11시에</div>':'<div><span class="t">—</span><mark>묻지 않은 질문</mark>: "이 시간에 거기서 뭐 하고 계셨어요?"</div>')+
+    '<div><span class="t">1:20</span><mark>(아주 작게 다른 목소리: "야, 됐어")</mark></div>'+
+    '<div style="margin-top:8px;color:var(--text)">규정은 보내라고 했다. 보낸 것은 틀리지 않았다. 비어 있던 25분이 문제였을 뿐.</div></div>';
+  const replay4 = c4.held ? '<h3>다시 듣기 — 23:06</h3><div class="replay"><div><span class="t">0:38</span>"불은 안 보여요. <mark>괜히 전화했나</mark> 모르겠네" — 22:40과 똑같이 들렸다</div>'+
+    (c4.asked.length>=2?'<div><span class="t">1:10</span><mark>(말끝에 작게 기침)</mark> — 있었다</div>':'<div><span class="t">—</span>한 번만 더 물었다면 <mark>기침</mark>이 섞였을 것이다</div>')+
+    '<div style="margin-top:8px;color:var(--text)">혼자 사는 70대가 연기 냄새를 맡고 전화했다. 그것이 우려가 아니면 무엇이 우려인가.</div></div>' : '';
+  const carry=[];
+  carry.push('301호 할머니 — <b>'+tierName(t)+'</b>'+(t>=2?'. 예후는 다음 밤에 연락이 온다':''));
+  if(L.c3==='pump') carry.push('허위신고 과태료 의뢰 1건 — 규정상 당신 잘못은 아니다. 비어 있던 25분은 기록에 남지 않는다');
+  if(L.c4.held) carry.push('화재를 비긴급으로 분류 — <b>3번·4번 조항 위반</b>. 녹취 3개월 보관. 감사에서 다시 듣게 된다');
+  if(L.scene.burn) carry.push('임볕 — 안면 1도 화상 (즉시 파괴 개방). 다음 밤 출동 가능, 목소리가 다를 것이다');
+  carry.push('박만수 — '+({listen:'2분 14초를 들어줬다. 그는 기억할 것이다',hold:'비긴급으로 끊었다. 이번 달 6번째',go:'1팀을 보냈다. 여섯 번째 헛걸음'}[L.manso]));
+  carry.push('03:12 — '+({patrol:'세탁소 초기 진압. <b>윤 주임이 기록을 오래 봤다</b>',police:'경찰 추적 불가. 세탁소 전소',log:'기록만. 세탁소 전소'}[L.herald])+(L.askedYun?'. 윤 주임에게 물었다 — "기록해"':''));
+  carry.push('임볕 — 첫 야간 출동 '+L.byeot.runs+'회'+(L.byeot.wasted?' (헛걸음 '+L.byeot.wasted+')':''));
+  $('#repBody').innerHTML='<h3>통화 기록</h3><table>'+rows+'</table>'+
+    (sc?'<h3>현장</h3><div>'+sc.title+' — <b>'+sc.result+'</b>'+(L.scene.room==='kitchen'?' · 주방을 먼저 뒤졌다 (40초)':'')+(L.scene.gas==='radio'?' · 가스 확인에 70초':'')+'</div>':'')+
+    replay3+replay4+
+    '<h3>밤 2로 넘어가는 것</h3><ul class="carry">'+carry.map(c=>'<li>'+c+'</li>').join('')+'</ul>'+
+    '<h3>윤 주임</h3><div>'+(L.c4.held?'"3번 조항. 목소리만 듣고 단정하지 말라고 써 있어. 읽어봤어?"':L.c3==='pump'?(t>=2?'"규정대로 했어. 그게 위로가 되면."':'"보고서 마저 써."'):L.herald==='patrol'?'"…내일 얘기하자."':(t<=1?'"…"':'"안내는 왜 안 했어."'))+'</div>';
+  $('#ovReport').classList.add('on');
+}
+
+/* ================= 밤 2 ================= */
+function board2(){
+  S.night=2; S.tools.callback=true; $('#tabArc').disabled=false;
+  $('#boardTitle').textContent='밤 2'; $('#boardTag').textContent='이월 · 공문';
+  const doc=[];
+  doc.push('<div class="h">남천소방서 119종합상황실 — 일일 공문</div>');
+  if(L.c3==='pump') doc.push('1. 전일 남천중학교 허위신고 건 — <b>과태료 의뢰서 작성 제출 바람</b> (소방기본법 56조, 1회 200만 원)');
+  if(L.c2==='go'||L.manso==='go') doc.push((L.c3==='pump'?'2':'1')+'. 비긴급 확인 출동 <b>'+((L.c2==='go'?1:0)+(L.manso==='go'?1:0))+'건</b> — 출동 적정성 검토. <b>허위·비긴급 출동률 감축 방안 강구</b>');
+  if(L.c4.held) doc.push('※ 현대아파트 301호 건 — 비긴급 분류 경위 <b>녹취 감사 예정</b>');
+  doc.push('※ 금일부로 <b>콜백 기능</b> 사용 가능 — 무응답·끊김 신고 시 즉시 재발신');
+  doc.push('<div style="margin-top:10px;color:var(--faint)">상황실장 (인)</div>');
+  $('#boardDoc').innerHTML=doc.join('<br>');
+  const li=[];
+  li.push('301호 할머니 — <b>'+tierName(L.c4.tier)+'</b>. 병원에서 연락이 올 것이다');
+  li.push('윤 주임 — '+(L.trust<=-3?'아침에 교대하며 당신을 보지 않았다':L.trust<0?'아침에 교대하며 한마디도 하지 않았다':'아침에 교대하며 고개를 한 번 끄덕였다'));
+  if(L.scene.burn) li.push('임볕 — 안면 화상. 오늘도 출동한다');
+  li.push('녹취 보관함이 열렸다 — 탭에서 어젯밤 통화를 다시 들을 수 있다');
+  $('#boardList').innerHTML=li.map(x=>'<li>'+x+'</li>').join('');
+  $('#ovReport').classList.remove('on'); $('#ovBoard').classList.add('on');
+}
+async function night2(){
+  $('#ovBoard').classList.remove('on');
+  pane.innerHTML=''; S.radio=[]; $('#radioBody').innerHTML='';
+  Object.values(S.teams).forEach(tm=>tm.busy=0); drawTeams();
+  S.t=hms(22,0,0); $('#clock').textContent=clockStr(S.t);
+  // 2-1 딸의 전화
+  jumpTo(0,10,20);
+  beginCall({id:'n2c1', title:'301호 할머니의 딸', num:'02-****-1180', truth:'문의'});
+  sys('밤 2 · 근무 시작. 윤 주임은 옆자리에 있다. 모니터만 본다.');
+  setLine('l1','live'); sfx.ring();
+  sys('00:10:20 · L1 수신 — 발신 02-****-1180 (서울)');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  const t=L.c4.tier;
+  if(t===0) await type('caller','신고자','늦은 시간에 죄송해요. 어제 현대아파트 301호… 저희 어머니 신고를 누가 받으셨는지. (잠깐) 어머니가 자꾸 수건 얘기를 하세요. 전화 받은 사람이 수건을 적시라고 했다고. 그 말만 하세요. 감사하다고 전해 달래요.');
+  else if(t===1) await type('caller','신고자','어제 현대아파트 301호 건이요. 저희 어머니요. 오늘 퇴원하셨어요. (잠깐) 근데 하나만 여쭐게요. '+(L.c4.team==='rescue'?'왜 9분이나 걸렸어요? 소방서가 코앞인데.':'감사해요. 그 말 하려고요.'));
+  else if(L.c4.held) await type('caller','신고자','현대아파트 301호요. 저희 어머니. 중환자실이에요. (아주 고른 목소리) 관리사무소에 확인 요청을 했다면서요. 어머니는 관리사무소가 아니라 119에 전화한 거예요. 그 통화, 녹음돼 있죠. 들을 수 있죠.');
+  else await type('caller','신고자','현대아파트 301호요. 저희 어머니. 중환자실이에요. (아주 고른 목소리) 어젯밤에 누가 받았어요. 녹음돼 있죠. 들을 수 있죠.');
+  const r=await menu([
+    {id:'rule', k:'규정', t:'"녹취 열람은 정보공개 절차로 신청하실 수 있습니다"', act:true},
+    {id:'truth', k:'사실', t:'"제가 받았습니다."', act:true},
+    ...(t>=2?[{id:'yun', k:'넘김', t:'윤 주임을 본다', act:true}]:[]),
+  ], t<=1?'감사 전화':'매뉴얼 9 — 녹취는 3개월 보관된다');
+  L.n2c1=r;
+  if(r==='rule'){ me('통화 녹취는 3개월 보관되며, 정보공개 청구 절차로 열람 신청하실 수 있습니다. 안내해 드리겠습니다.'); tick(20);
+    await type('caller','신고자', t<=1?'네… 아뇨, 됐어요. 감사하다고만.':'…절차요. 네. 알겠어요. (끊기 직전) 어젯밤에도 그렇게 말했겠죠.'); }
+  else if(r==='truth'){ me('제가 받았습니다.'); tick(12);
+    await type('caller','신고자', t<=1?'(잠깐) …고마워요. 어머니가 그 목소리를 기억하세요.':t>=2&&L.c4.held?'(긴 정적) …왜 안 보냈어요.':'(긴 정적) …늦었어요. 알죠.');
+    if(t>=2) L.trust-=1; }
+  else { sys('(윤 주임이 수화기를 집는다)'); tick(8);
+    await yun('상황실 윤서진입니다. 어젯밤 건은 제가 받았습니다.');
+    await type('caller','신고자','(정적) …당신이요.');
+    await yun('네. 궁금하신 건 저한테 하세요.');
+    tick(30); sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+    await wait(600);
+    await yun('(수화기를 내려놓고, 모니터로 돌아간다. 아무 말도 하지 않는다.)');
+    L.yunCovered=true;
+    endCall({judge:'윤 주임이 받음', result:'—'});
+    await afterN2c1(); return;
+  }
+  sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+  endCall({judge:{rule:'규정 안내',truth:'사실대로'}[r], result:'—'});
+  await afterN2c1();
+}
+async function afterN2c1(){
+  // 2-2 무응답 → 콜백
+  jumpTo(1,48,5);
+  beginCall({id:'n2c2', title:'무응답 신고', num:'010-****-4402', truth:'주머니 오발신'});
+  setLine('l1','live'); sfx.ring();
+  sys('01:48:05 · L1 수신 — 발신 010-****-4402');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','(숨소리) (옷 스치는 소리) (아무 말 없음)');
+  me('여보세요. 119입니다. 말씀하실 수 있으면 말씀하세요. 말씀이 어려우시면 아무 버튼이나 눌러 주세요.');
+  tick(15);
+  await type('caller','신고자','(멀리서 웅얼거리는 소리) (뚝)');
+  sys('L1 통화 종료 — 상대방 끊음'); setLine('l1','');
+  const r=await menu([
+    {id:'cb', k:'콜백', t:'즉시 재발신 (콜백)', act:true},
+    {id:'police', k:'공동', t:'무응답 — 경찰 공동대응 · 위치 추적 요청', act:true},
+    {id:'log', k:'기록', t:'기록만', act:true},
+  ],'무응답 신고 — 새 도구');
+  if(r==='cb'){ sys('재발신 중…'); tick(12); setLine('l1','live'); sfx.ring();
+    await type('caller','신고자','여보세요? 어… 119요? 아 죄송해요, 주머니에서 눌렸나 봐요. 죄송합니다.');
+    me('괜찮습니다. 위급 상황 아니신 거죠. 네, 안녕히 가세요.'); tick(10);
+    sfx.hangup(); sys('L1 통화 종료'); setLine('l1',''); }
+  else if(r==='police'){ me('무응답 신고. 경찰 공동대응, 위치 추적 요청.'); tick(10); await wait(400);
+    radio('상황실','경찰: 기지국 반경 1.2km. 순찰차 배치.'); tick(14*60);
+    radio('상황실','경찰: 신고자 확인. 귀가 중 주머니 오발신. 종결.'); }
+  else { me('기록.'); tick(5); await yun('콜백. 오늘부터 되잖아.'); L.trust--; }
+  endCall({judge:{cb:'콜백',police:'경찰 공동대응',log:'기록만'}[r], result:r==='log'?'규정 미이행':'정상'});
+  // 2-3 박만수
+  jumpTo(2,31,10);
+  beginCall({id:'n2c3', title:'박만수', num:'010-****-7749', truth:'?'});
+  setLine('l1','live'); sfx.ring();
+  sys('02:31:10 · L1 수신 — 발신 010-****-7749');
+  await yun('또.');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  if(L.manso==='listen') await type('caller','신고자','…어제 그 사람이오? (한참) 오늘은 냄새 안 나요. 그냥… 됐어요. 미안해요.');
+  else if(L.manso==='go') await type('caller','신고자','…오늘은 안 와도 돼요. 어제 온 사람들이 나를 그렇게 봤어. (한참) 냄새는 나는데.');
+  else await type('caller','신고자','…옆집에서 탄내가 나는데. (느리게) 끊을 거면 끊어요.');
+  const r2=await menu([
+    {id:'listen', k:'듣기', t:'"말씀하세요."', act:true},
+    {id:'hold', k:'분류', t:'비긴급 — 안내 후 종료', act:true},
+  ],'이번 달 7번째');
+  if(r2==='listen'){ me('말씀하세요.'); tick(50); await type('caller','신고자','(긴 침묵) …고마워요. (뚝)'); }
+  else { me('연기가 보이면 다시 전화 주세요.'); tick(6); await type('caller','신고자','…그래요.'); }
+  sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+  L.manso2=r2;
+  endCall({judge:r2==='listen'?'들음':'비긴급', result:'—'});
+  await wait(800);
+  gap('— 계속됩니다 —');
+  await nar('03:12가 온다. 윤 주임이 시계를 보지 않으려고 애쓰는 것이 보인다.');
+  await menu([{id:'end',k:'—',t:'밤 2는 여기까지 만들어져 있습니다',act:true}],'슬라이스 종료');
+  $('#repTitle').textContent='밤 2 — 여기까지';
+  $('#repBody').innerHTML='<h3>이 빌드의 끝</h3><div>밤 1 전체와 밤 2의 앞부분까지입니다.<br><br>'+
+    '녹취 탭에서 어젯밤 03:12 통화를 다시 들어 보세요.</div>'+
+    '<h3>장부</h3><div class="replay">'+Object.entries({'301호':tierName(L.c4.tier),'23:05':L.c3,'박만수':L.manso+' → '+L.manso2,'03:12':L.herald,'윤 주임 신뢰':L.trust,'딸의 전화':L.n2c1+(L.yunCovered?' (윤 주임이 대신 받음)':'')}).map(([k,v])=>'<div><span class="t">'+k+'</span>'+v+'</div>').join('')+'</div>';
+  $('#btnNext').style.display='none';
+  $('#ovReport').classList.add('on');
+}
+
+/* ================= 흐름 ================= */
+async function night1(){
+  S.night=1; S.phase='n1';
+  await call1(); await call2(); await call3(); await call4(); await call5(); await call6(); await call7();
+  await wait(600);
+  await menu([{id:'rep',k:'기록',t:'근무 기록 보기',act:true}],'06:00 · 교대');
+  report1();
+}
+function reset(){ location.reload(); }
+$('#btnStart').onclick=()=>{ audioInit(); $('#ovIntro').classList.remove('on'); drawTeams(); night1(); };
+$('#btnNext').onclick=()=>{ board2(); };
+$('#btnBoard').onclick=()=>{ night2(); };
+$('#btnAgain').onclick=reset;
+addEventListener('keydown',e=>{ if(e.code==='Enter'&&$('#ovIntro').classList.contains('on')) $('#btnStart').click(); });
+drawTeams();
+
+addEventListener('unhandledrejection',e=>{ window.__err=String((e.reason&&e.reason.stack)||e.reason); });
+addEventListener('error',e=>{ window.__err=String(e.message+' @'+e.lineno); });
+window.__dev={S,L, click(i){ const b=document.querySelectorAll('#opts .opt')[i]; if(b&&!b.disabled){ b.click(); return true;} return false; },
+  labels(){ return [...document.querySelectorAll('#opts .opt')].map(b=>(b.disabled?'[x] ':'')+b.textContent.trim()); },
+  start(){ S.fast=true; $('#btnStart').click(); }, report:()=>$('#repBody').innerText, text:()=>pane.innerText,
+  next(){ $('#btnNext').click(); }, board(){ $('#btnBoard').click(); } };
 })();
 </script>
 </body>
 </html>
+

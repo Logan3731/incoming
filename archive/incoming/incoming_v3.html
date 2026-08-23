@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>수신 중 — 슬라이스 v3</title>
+<style>
+  :root{
+    --ground:#0E0D0C; --panel:#151312; --line:#2A2520;
+    --bone:#E3E9EA; --text:#B8BFC1; --dim:#717878; --faint:#474D4E;
+    --ember:#E4552B; --teal:#5FC9CF; --gold:#F2C94C;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;background:var(--ground);overflow:hidden;
+    font-family:var(--sans);color:var(--text);-webkit-font-smoothing:antialiased;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #stage{position:absolute;top:0;left:0;width:620px;height:1060px;transform-origin:top left;
+    display:flex;flex-direction:column;background:var(--ground)}
+
+  /* ── 상단 계기 ── */
+  header{padding:22px 28px 12px;border-bottom:1px solid var(--line)}
+  .row1{display:flex;align-items:baseline;justify-content:space-between}
+  #clock{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--bone);letter-spacing:.04em}
+  .lines{display:flex;gap:18px;font-family:var(--mono);font-size:12px}
+  .ln{display:flex;align-items:center;gap:7px;color:var(--faint)}
+  .ln i{width:9px;height:9px;border-radius:50%;background:var(--faint);display:inline-block}
+  .ln.live{color:var(--teal)} .ln.live i{background:var(--teal)}
+  .ln.wait{color:var(--ember)} .ln.wait i{background:var(--ember);animation:blink .9s steps(1) infinite}
+  @keyframes blink{50%{opacity:.15}}
+  .row2{display:flex;gap:8px;margin-top:12px;font-family:var(--mono);font-size:11px}
+  .team{padding:5px 10px;border:1px solid var(--line);color:var(--dim);letter-spacing:.06em}
+  .team.out{color:var(--ember);border-color:#4a2a22}
+  .team.ok{color:var(--teal);border-color:#23474a}
+
+  /* ── 탭 ── */
+  nav{display:flex;border-bottom:1px solid var(--line)}
+  nav button{flex:1;background:none;border:none;color:var(--faint);font-family:var(--mono);
+    font-size:12px;letter-spacing:.18em;padding:13px 0;cursor:pointer;border-bottom:2px solid transparent}
+  nav button.on{color:var(--bone);border-bottom-color:var(--teal)}
+  nav button.dot::after{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--ember);margin-left:6px;vertical-align:middle}
+
+  /* ── 본문 ── */
+  main{flex:1;overflow-y:auto;padding:22px 28px;scroll-behavior:smooth}
+  .pane{display:none} .pane.on{display:block}
+  .msg{margin-bottom:14px;line-height:1.75;font-size:16px;max-width:540px}
+  .msg .who{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--faint);display:block;margin-bottom:2px}
+  .msg.caller{color:var(--bone)}
+  .msg.me{color:var(--teal)}
+  .msg.sys{color:var(--dim);font-family:var(--mono);font-size:12.5px;letter-spacing:.04em}
+  .msg.radio{color:var(--text);font-family:var(--mono);font-size:13.5px;border-left:2px solid var(--line);padding-left:12px}
+  .msg.radio .who{color:var(--ember)}
+  .msg.yun{color:var(--text)} .msg.yun .who{color:var(--gold)}
+  .cue{color:var(--dim);font-style:italic}
+  .cur{display:inline-block;width:8px;height:16px;background:var(--bone);vertical-align:-2px;animation:blink .7s steps(1) infinite}
+  .manual li{margin:0 0 14px 0;padding-left:32px;position:relative;line-height:1.7;font-size:14.5px;list-style:none}
+  .manual li .n{position:absolute;left:0;top:1px;font-family:var(--mono);color:var(--ember);font-weight:700}
+  .manual li b{color:var(--bone);font-weight:700}
+  .res{font-family:var(--mono);font-size:13px;line-height:2.2}
+  .res b{color:var(--bone);font-weight:600}
+  .res .out{color:var(--ember)} .res .ok{color:var(--teal)}
+
+  /* ── 행동 ── */
+  footer{border-top:1px solid var(--line);padding:14px 20px 22px;min-height:150px}
+  .hint{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--faint);margin:0 8px 10px}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{background:var(--panel);border:1px solid var(--line);color:var(--text);text-align:left;
+    font-family:inherit;font-size:15px;padding:13px 16px;cursor:pointer;display:flex;gap:12px;align-items:center}
+  .opt:active{background:#1d1a18}
+  .opt .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ember);flex:none;width:48px}
+  .opt.act .k{color:var(--teal)}
+  .opt:disabled{opacity:.35;cursor:default}
+  .optrow{display:flex;gap:8px}
+  .optrow .opt{flex:1;justify-content:center}
+
+  /* ── 오버레이 ── */
+  .overlay{position:absolute;inset:0;background:var(--ground);display:none;flex-direction:column;
+    padding:60px 44px;overflow-y:auto}
+  .overlay.on{display:flex}
+  h1{font-size:56px;letter-spacing:.3em;text-indent:.3em;font-weight:800;color:var(--bone);line-height:1;text-align:center}
+  .tag{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--ember);text-align:center;margin-top:16px}
+  .brief{margin:40px auto 0;max-width:440px;font-size:15px;line-height:1.95}
+  .brief p{margin-bottom:16px}
+  .brief b{color:var(--bone)}
+  .btn{display:block;margin:38px auto 0;border:none;background:transparent;color:var(--teal);font-family:inherit;
+    font-size:19px;font-weight:800;letter-spacing:.12em;padding:19px 52px;cursor:pointer;
+    background-image:linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal));
+    background-repeat:no-repeat;
+    background-size:16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px;
+    background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom}
+  .btn:disabled{color:var(--faint);opacity:.5}
+  h2{font-size:26px;font-weight:800;color:var(--bone);letter-spacing:.04em}
+  .rep{max-width:520px;margin:28px auto 0;font-size:14.5px;line-height:1.8}
+  .rep h3{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--ember);margin:26px 0 10px}
+  .rep table{width:100%;border-collapse:collapse;font-size:14px}
+  .rep td{padding:9px 6px;border-top:1px solid var(--line);vertical-align:top}
+  .rep td:first-child{font-family:var(--mono);color:var(--dim);width:64px}
+  .rep .truth{color:var(--bone);font-weight:700}
+  .rep .bad{color:var(--ember)} .rep .good{color:var(--teal)}
+  .replay{font-family:var(--mono);font-size:13px;color:var(--dim);line-height:1.9}
+  .replay mark{background:none;color:var(--ember);font-weight:700}
+  .replay .t{color:var(--faint);margin-right:10px}
+  .carry li{margin-left:18px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header>
+    <div class="row1">
+      <div id="clock">23:05:10</div>
+      <div class="lines">
+        <span class="ln" id="l1"><i></i>L1</span>
+        <span class="ln" id="l2"><i></i>L2</span>
+      </div>
+    </div>
+    <div class="row2" id="teams"></div>
+  </header>
+  <nav>
+    <button class="on" data-tab="call">통화</button>
+    <button data-tab="manual">매뉴얼</button>
+    <button data-tab="res">자원</button>
+    <button data-tab="radio">무전</button>
+  </nav>
+  <main>
+    <div class="pane on" id="pane-call"></div>
+    <div class="pane" id="pane-manual">
+      <ol class="manual">
+        <li><span class="n">1.</span> 첫 응답: <b>"남천 119입니다. 무엇을 도와드릴까요?"</b> 마무리: "소방차량 출동시켰습니다. 저는 상황실 ○○○입니다."</li>
+        <li><span class="n">2.</span> 도입부 공통질문 — ① 위치(정확한 주소. 불가 시 주변 건물·상호·전신주·승강기 번호) ② 연소상황과 인명(불꽃·연기 규모, 구조대상자, 대피 여부, 출입문) ③ 신고자(대상물과의 관계, 연락처)</li>
+        <li><span class="n">3.</span> 예고지령은 접수와 동시에 시작한다. <b>신고자의 목소리만 듣고 장난·허위라고 단정하지 말고 우선 출동 조치한다.</b></li>
+        <li><span class="n">4.</span> 출동기준 3단계 — <b>긴급</b>(즉시 출동) · <b>잠재긴급</b>(방치 시 2차 사고, 출동) · <b>비긴급</b>(인명·재산 우려 없음 → 1차 유관기관·민간 통보, 2차 필요시 출동)</li>
+        <li><span class="n">5.</span> 출동 지령 후 안내: 진입로·대피유도·가스차단 고지. <b>"모르는 번호로 전화가 와도 꼭 받아주세요. 변화가 생기면 즉시 다시 119."</b></li>
+        <li><span class="n">6.</span> 허위신고 과태료(소방기본법 56조): 1회 200만 · 2회 400만 · 3회 이상 500만 원. 판단은 <b>사후 조사</b>로 한다 — 접수 단계에서 가리지 않는다</li>
+        <li><span class="n">7.</span> 가용 자원: 펌프 1팀 · 구조대 1 · 구급 1. 출동 후 복귀까지 약 25분. 가까운 대 또는 반드시 필요한 대부터</li>
+        <li><span class="n">8.</span> 모든 통화는 녹취되어 <b>3개월</b> 보관된다</li>
+      </ol>
+    </div>
+    <div class="pane" id="pane-res"><div class="res" id="resBody"></div></div>
+    <div class="pane" id="pane-radio"><div id="radioBody"></div></div>
+  </main>
+  <footer>
+    <div class="hint" id="hint"></div>
+    <div class="opts" id="opts"></div>
+  </footer>
+
+  <div class="overlay on" id="ovIntro">
+    <h1>수신 중</h1>
+    <div class="tag">밤 1 · 슬라이스 v3 — 3번과 4번 전화</div>
+    <div class="brief">
+      <p>22시에 두 건을 처리했다. 주택 화재 하나, 고기 굽는 연기 하나.<br>
+      옆자리의 <b>윤 주임</b>은 두 번째 통화가 끝난 뒤로 한마디도 하지 않았다.</p>
+      <p><b>질문 하나에 시간이 간다.</b> 두 번째 라인이 깜빡이면, 그게 무엇이든 기다리고 있는 것이다.</p>
+      <p>펌프 1팀은 차고에 돌아와 있다. 차수호, 마도수, 그리고 오늘 첫 출동을 다녀온 임볕.</p>
+      <p class="cue">23시 5분. 벨이 울린다.</p>
+    </div>
+    <button class="btn" id="btnStart">받는다</button>
+  </div>
+
+  <div class="overlay" id="ovReport">
+    <h2 id="repTitle">밤 1 — 근무 기록</h2>
+    <div class="rep" id="repBody"></div>
+    <button class="btn" id="btnAgain">다른 선택으로 다시</button>
+    <button class="btn" disabled style="margin-top:14px">밤 2로 <small style="font-family:var(--mono);font-size:11px;opacity:.6"> — 슬라이스에는 없습니다</small></button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const stage=$('#stage');
+function fit(){ const s=Math.min(innerWidth/620, innerHeight/1060);
+  stage.style.transform='translate('+((innerWidth-620*s)/2)+'px,'+((innerHeight-1060*s)/2)+'px) scale('+s+')'; }
+addEventListener('resize',fit); fit();
+
+/* ================= 상태 ================= */
+const S={
+  t:23*3600+5*60+10,           // 23:05:10
+  fast:false,                   // 테스트용 — 타이핑 생략
+  teams:{ pump:{name:'1팀', crew:'차수호·마도수·임볕', busy:0}, rescue:{name:'구조대', crew:'한이레·도강', busy:0}, amb:{name:'구급', crew:'', busy:0} },
+  l2wait:null,                  // 2번 라인이 깜빡이기 시작한 시각
+  c3:{asked:[], decision:null, dispatched:null},
+  c4:{asked:[], guided:false, dispatched:[], waited:0, tier:null, n:0},
+  radio:[], unread:false, phase:'intro'
+};
+const pad=n=>String(n).padStart(2,'0');
+const clockStr=t=>pad(Math.floor(t/3600)%24)+':'+pad(Math.floor(t/60)%60)+':'+pad(t%60);
+function tick(sec){ S.t+=sec; $('#clock').textContent=clockStr(S.t);
+  Object.values(S.teams).forEach(tm=>{ if(tm.busy>0) tm.busy=Math.max(0,tm.busy-sec); });
+  drawTeams(); }
+function drawTeams(){
+  $('#teams').innerHTML=Object.values(S.teams).map(tm=>
+    '<span class="team '+(tm.busy>0?'out':'ok')+'">'+tm.name+(tm.busy>0?' 출동중 '+Math.ceil(tm.busy/60)+'분':' 대기')+'</span>').join('');
+  $('#resBody').innerHTML=Object.values(S.teams).map(tm=>
+    '<b>'+tm.name+'</b> '+(tm.crew?'— '+tm.crew:'')+'<br>'+(tm.busy>0?'<span class="out">출동 중 · 복귀까지 '+Math.ceil(tm.busy/60)+'분</span>':'<span class="ok">차고 대기</span>')+'<br><br>').join('');
+}
+function setLine(id,cls){ const el=$('#'+id); el.className='ln '+(cls||'');
+  if(id==='l2') beepLoop(cls==='wait'); }
+
+/* ================= 탭 ================= */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); $('#pane-'+b.dataset.tab).classList.add('on');
+  if(b.dataset.tab==='radio'){ b.classList.remove('dot'); S.unread=false; }
+});
+
+/* ================= 소리 — 전부 코드로 합성 ================= */
+let AC=null, beepTimer=null;
+function audioInit(){ if(S.fast) return;
+  try{ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); }catch(e){} }
+addEventListener('pointerdown',audioInit,{passive:true});
+function tone(freq,dur,gain,type){
+  if(!AC) return;
+  const o=AC.createOscillator(), g=AC.createGain(), t=AC.currentTime;
+  o.type=type||'sine'; o.frequency.value=freq; o.connect(g); g.connect(AC.destination);
+  g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.start(t); o.stop(t+dur);
+}
+function noise(dur,gain,freq){
+  if(!AC) return;
+  const n=(AC.sampleRate*dur)|0, b=AC.createBuffer(1,n,AC.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+  const src=AC.createBufferSource(); src.buffer=b;
+  const f=AC.createBiquadFilter(); f.type='bandpass'; f.frequency.value=freq||1800; f.Q.value=0.8;
+  const g=AC.createGain(); g.gain.value=gain;
+  src.connect(f); f.connect(g); g.connect(AC.destination); src.start();
+}
+const sfx={
+  tick(){
+    noise(.028, .16, 2600+Math.random()*900);        // 활자가 리본을 때리는 소리
+    tone(170+Math.random()*40, .03, .07, 'triangle'); // 타격의 무게
+    if(Math.random()<0.08) tone(3200,.012,.05,'sine'); // 가끔 금속성 '띵'
+  },
+  bell(){ tone(2400,.25,.08); tone(3100,.2,.04); },   // 줄 끝 캐리지 벨
+  ring(){ const r=()=>{ tone(440,.45,.07); tone(480,.45,.07); }; r(); setTimeout(r,650); },
+  beep(){ tone(920,.08,.045); },
+  squelch(){ noise(.08,.10,1600); },
+  hangup(){ [0,320,640].forEach(d=>setTimeout(()=>tone(425,.16,.05),d)); },
+  stamp(){ tone(160,.09,.14,'triangle'); noise(.04,.06,600); },
+  cough(){ noise(.12,.07,700); }
+};
+function beepLoop(on){
+  if(beepTimer){ clearInterval(beepTimer); beepTimer=null; }
+  if(on&&!S.fast) beepTimer=setInterval(()=>sfx.beep(),1500);
+}
+
+/* ================= 출력 ================= */
+const pane=$('#pane-call');
+function scrollDown(){ const m=$('main'); m.scrollTop=m.scrollHeight; }
+function line(cls,who,html){
+  const d=document.createElement('div'); d.className='msg '+cls;
+  d.innerHTML=(who?'<span class="who">'+who+'</span>':'')+html;
+  pane.appendChild(d); scrollDown(); return d;
+}
+/* 타이핑 — 괄호 속은 배경음 */
+function type(cls,who,text){
+  if(S.fast){   // 테스트 모드 — 타이머 없이 즉시
+    line(cls,who,text.replace(/(\([^)]*\))/g,'<span class="cue">$1</span>'));
+    return Promise.resolve();
+  }
+  return new Promise(res=>{
+    const d=line(cls,who,'');
+    const body=document.createElement('span'); d.appendChild(body);
+    const cur=document.createElement('span'); cur.className='cur'; d.appendChild(cur);
+    const parts=text.split(/(\([^)]*\))/);
+    let html='', i=0, j=0;
+    function step(){
+      if(i>=parts.length){ cur.remove(); if(cls==='caller'&&!S.fast) sfx.bell(); res(); return; }
+      const p=parts[i];
+      if(p.startsWith('(')){ html+='<span class="cue">'+p+'</span>'; i++; j=0; body.innerHTML=html; scrollDown();
+        if(p.includes('기침')) sfx.cough(); else if(!S.fast) noise(.05,.03,900);
+        setTimeout(step,S.fast?0:300); return; }
+      if(j<p.length){ html+=p[j]; j++; body.innerHTML=html; scrollDown();
+        const ch=p[j-1]; if(ch!==' ') sfx.tick();
+        setTimeout(step,S.fast?0:(ch==='…'?240:/[.?!]/.test(ch)?170:34)); }
+      else { i++; j=0; step(); }
+    }
+    step();
+  });
+}
+const me=t=>line('me','나',t);
+const sys=t=>line('sys','',t);
+const yun=t=>type('yun','윤 주임',t);
+function radio(who,t){
+  sfx.squelch();
+  const stamp=clockStr(S.t).slice(0,5);
+  S.radio.push({stamp,who,t});
+  $('#radioBody').innerHTML=S.radio.map(r=>'<div class="msg radio"><span class="who">'+r.stamp+' · '+r.who+'</span>'+r.t+'</div>').join('');
+  const nb=document.querySelector('nav button[data-tab=radio]');
+  if(!nb.classList.contains('on')){ nb.classList.add('dot'); S.unread=true; }
+  return line('radio',null,'<span class="who">'+stamp+' · '+who+'</span>'+t);
+}
+function opts(list,hint){
+  $('#hint').textContent=hint||'';
+  const box=$('#opts'); box.innerHTML='';
+  list.forEach(o=>{
+    const b=document.createElement('button'); b.className='opt'+(o.act?' act':'');
+    b.innerHTML='<span class="k">'+o.k+'</span>'+o.t;
+    if(o.disabled) b.disabled=true;
+    b.onclick=()=>{ box.innerHTML=''; $('#hint').textContent=''; o.f(); };
+    box.appendChild(b);
+  });
+}
+const wait=ms=>S.fast?Promise.resolve():new Promise(r=>setTimeout(r,ms));
+
+/* ================= 3번 전화 — 장난 (침착하고 구체적이다) ================= */
+async function call3(){
+  S.phase='c3';
+  setLine('l1','live'); sfx.ring();
+  sys('23:05:10 · L1 수신 — 발신 010-****-3317');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','여보세요, 불이요. 남천중학교 뒤쪽 체육관에서 불이 나요. (바람 소리) 연기가 엄청 나요.');
+  c3menu();
+}
+function c3menu(){
+  const a=S.c3.asked;
+  const qs=[
+    {id:'where', k:'질문', t:'어디서 전화하시는 겁니까?', f:async()=>{ me('지금 어디서 전화하시는 겁니까?'); tick(22);
+      await type('caller','신고자','남천중학교요, 운동장 앞이요. 체육관 쪽에서 나요. (바람 소리)'); after('where'); }},
+    {id:'fire', k:'질문', t:'불꽃이 보입니까, 연기입니까?', f:async()=>{ me('불꽃이 보입니까, 연기입니까? 어느 쪽에서요?'); tick(24);
+      await type('caller','신고자','연기요… 위쪽 창문에서요. 2층… 아, 체육관은 1층이죠. 위쪽 창문이요.'); after('fire'); }},
+    {id:'people', k:'질문', t:'안에 사람이 있습니까?', f:async()=>{ me('학교 안에 사람이 있습니까?'); tick(20);
+      await type('caller','신고자','(잠깐 멈춤) 경비 아저씨 계실 건데… 모르겠어요.'); after('people'); }},
+    {id:'why', k:'질문', t:'이 시간에 거기서 뭐 하고 계셨어요?', f:async()=>{ me('이 시간에 학교 앞에서 뭐 하고 계셨습니까?'); tick(18);
+      await type('caller','신고자','어… 친구들이랑 농구요. (뒤에서 누가 뭐라고 한다) 아니, 지나가다가요.'); after('why'); }},
+    {id:'name', k:'질문', t:'성함과 연락처를 말씀해 주세요', f:async()=>{ me('신고자 성함과 연락처를 말씀해 주십시오.'); tick(18);
+      await type('caller','신고자','박준호요. 이 번호로 하시면 돼요.'); after('name'); }},
+  ].filter(q=>!a.includes(q.id));
+  const acts=[
+    {k:'출동', t:'1팀 출동 지령 — 남천중 체육관', act:true, f:()=>c3decide('pump')},
+    {k:'확인', t:'구급 1대만 확인 출동', act:true, disabled:S.teams.amb.busy>0, f:()=>c3decide('amb')},
+    {k:'보류', t:'허위 의심 — 보류 후 재접수 대기', act:true, f:()=>c3decide('hold')},
+  ];
+  opts([...qs.slice(0,3),...acts], a.length?'질문 '+a.length+'회 · 매뉴얼 3·4 참조':'위치 → 상황 → 인명');
+}
+async function after(id){
+  S.c3.asked.push(id);
+  if(S.c3.asked.length===2 && !S.l2wait){
+    S.l2wait=S.t; setLine('l2','wait');
+    sys('L2 수신 대기 — 발신 010-****-0082');
+  }
+  if(S.c3.asked.length>=3){
+    await wait(500);
+    await type('caller','신고자','(수화기 너머, 아주 작게 다른 목소리: "야, 됐어") …저 가봐야 돼요. 빨리 와주세요.');
+    sfx.hangup();
+    sys('L1 통화 종료 — 상대방 끊음');
+    setLine('l1','');
+    opts([
+      {k:'출동', t:'1팀 출동 지령 — 남천중 체육관', act:true, f:()=>c3decide('pump')},
+      {k:'확인', t:'구급 1대만 확인 출동', act:true, f:()=>c3decide('amb')},
+      {k:'보류', t:'허위 판단 — 기록 후 종료', act:true, f:()=>c3decide('hold')},
+    ],'상대가 끊었다. 판단은 남아 있다');
+    return;
+  }
+  c3menu();
+}
+async function c3decide(d){
+  S.c3.decision=d; S.c3.dispatched = d==='hold'?null:d;
+  setLine('l1','');
+  if(d==='pump'){
+    sfx.stamp(); me('1팀, 남천중학교 체육관 화재. 신고자 운동장 앞. 출동. 사륙?');
+    S.teams.pump.busy=25*60; tick(8);
+    radio('차수호','사칠. 1팀 출동, 남천중 방면.');
+    await wait(500);
+    await yun('학교야. 보고 대상이다. 최초보고 양식 띄워.');
+    await wait(700);
+    radio('임볕','(숨소리) 1팀 후속, 출동합니다.');
+  } else if(d==='amb'){
+    sfx.stamp(); me('구급 1, 남천중 체육관. 현장 확인 출동. 사륙?');
+    S.teams.amb.busy=25*60; tick(8);
+    radio('구급 1','사칠. 구급 1, 남천중으로 이동.');
+  } else {
+    me('허위 의심. 보류 기록.'); tick(6);
+    await yun('…3번 조항, 알지. 네 판단이야. 받아.');
+  }
+  drawTeams();
+  await wait(600);
+  call4();
+}
+
+/* ================= 4번 전화 — 진짜 (비응급처럼 들린다) ================= */
+async function call4(){
+  S.phase='c4'; S.c4.n=0;
+  S.c4.waited = S.l2wait ? (S.t - S.l2wait) : 0;
+  setLine('l2','live'); sfx.ring();
+  sys(clockStr(S.t)+' · L2 연결 — 대기 '+Math.round(S.c4.waited)+'초');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','여보세요… 거기 119 맞죠. 밤늦게 미안한데요… 냄새가 나서요.');
+  c4menu();
+}
+/* 진실은 시간이 갈수록 새어나온다 — 확신은 비싸다 */
+function leak(){
+  const n=S.c4.n+1;           // 지금 진행 중인 교환의 순번
+  if(n===2) return ' (말끝에 작게 기침)';
+  if(n>=3) return ' (기침) 어… 방이 좀 뿌연 것 같기도 하고…';
+  return '';
+}
+function c4menu(){
+  const a=S.c4.asked, p=S.teams.pump, r=S.teams.rescue, am=S.teams.amb;
+  const qs=[
+    {id:'where', k:'질문', t:'지금 계신 곳이 어디입니까?', f:async()=>{ me('지금 계신 곳이 어디입니까? 동, 호수 말씀해 주세요.'); tick(26);
+      await type('caller','신고자','현대아파트… 3동 301호요. 아니, 302… (한참) 301호 맞아요. 3동.'+leak()); after4('where'); }},
+    {id:'smell', k:'질문', t:'무슨 냄새입니까? 불이 보입니까?', f:async()=>{ me('무슨 냄새입니까? 불꽃이나 연기가 보입니까?'); tick(22);
+      await type('caller','신고자','타는 냄새요. 옆집인가 싶어서요… 불은 안 보여요. 괜히 전화했나 모르겠네.'+leak()); after4('smell'); }},
+    {id:'alone', k:'질문', t:'혼자 계십니까?', f:async()=>{ me('집에 혼자 계십니까?'); tick(16);
+      await type('caller','신고자','네… 혼자요. 딸은 서울에 있고…'+leak()); after4('alone'); }},
+    {id:'door', k:'질문', t:'현관문 쪽은 어떻습니까?', f:async()=>{ me('현관문 쪽으로 가 보시겠어요? 손등으로 손잡이를 대 보세요. 손바닥 말고 손등이요.'); tick(30);
+      await type('caller','신고자','(한참) (기침) 어… 문 쪽이 뿌옇네요… (기침) 손잡이가, 뜨거워요.'); after4('door'); }},
+  ].filter(q=>!a.includes(q.id)).filter(q=>q.id!=='door'||a.length>=1);
+  const acts=[];
+  if(!S.c4.guided) acts.push({k:'안내', t:'젖은 수건으로 문틈을 막고, 낮게 엎드리세요', act:true, f:guide});
+  if(a.includes('where')){
+    acts.push({k:'출동', t:(p.busy>0?'1팀 — 출동 중 (복귀 '+Math.ceil(p.busy/60)+'분)':'1팀 출동 — 현대아파트 3동'), act:true, disabled:p.busy>0, f:()=>dispatch4('pump')});
+    acts.push({k:'출동', t:'구조대 출동 — 현대아파트 3동', act:true, f:()=>dispatch4('rescue')});
+    acts.push({k:'확인', t:(am.busy>0?'구급 — 출동 중':'구급 1대만 확인 출동'), act:true, disabled:am.busy>0, f:()=>dispatch4('amb')});
+    acts.push({k:'보류', t:'비긴급 분류 — 관리사무소 확인 요청 후 종료', act:true, f:()=>dispatch4('hold')});
+  } else {
+    acts.push({k:'출동', t:'출동 지령 — 위치 미확인', act:true, disabled:true, f:()=>{}});
+  }
+  opts([...qs.slice(0,3),...acts], a.includes('where')?'위치 확인됨 · 질문 '+a.length+'회':'매뉴얼 2 — 위치 먼저');
+}
+async function after4(id){ S.c4.asked.push(id); S.c4.n++; c4menu(); }
+async function guide(){
+  S.c4.guided=true;
+  me('할머니, 제 말 들리세요. 수건을 물에 적셔서 문틈을 막으세요. 그리고 바닥에 낮게 엎드리세요. 연기는 위로 갑니다.');
+  tick(34);
+  await type('caller','신고자','수건… 네… (물 소리) (한참) 했어요… 엎드렸어요.');
+  me('잘하셨어요. 끊지 마세요. 계속 말씀하세요.');
+  c4menu();
+}
+async function dispatch4(which){
+  S.c4.dispatched.push(which);
+  if(which==='hold'){
+    me('연기가 보이지는 않으시는 거죠. 관리사무소에 확인 요청해 두겠습니다. 냄새가 심해지거나 연기가 보이면 즉시 다시 119 눌러 주세요.'); tick(10);
+    await type('caller','신고자','네… 미안해요, 밤늦게.');
+    sfx.hangup(); sys('L2 통화 종료'); setLine('l2','');
+    await wait(900);
+    tick(11*60);
+    // 11분 뒤 — 이웃의 전화
+    setLine('l1','live'); sfx.ring();
+    sys(clockStr(S.t)+' · L1 수신 — 발신 010-****-5561');
+    await type('caller','신고자','(다급하게) 3동 301호에서 연기가 막 나와요! 복도가 다 뿌예요! 창문으로 불꽃 보여요!');
+    const team = S.teams.pump.busy>0 ? 'rescue' : 'pump';
+    sfx.stamp();
+    me((team==='pump'?'1팀':'구조대')+', 현대아파트 3동 301호. 화재. 요구조자 1명 추정. 출동.');
+    S.teams[team].busy=25*60; tick(8);
+    radio(team==='pump'?'차수호':'한이레',(team==='pump'?'1팀':'구조대')+' 출동. 3동.'+(team==='pump'?' 6분.':' 9분.'));
+    setLine('l1','');
+    drawTeams();
+    await resolve4(team,true);
+    return;
+  }
+  setLine('l2','');
+  sfx.stamp();
+  if(which==='pump'){
+    me('1팀, 현대아파트 3동 301호. 연기 냄새 신고, 70대 여성 단독 거주, 현관문 개방 불가. 출동. 사륙?');
+    S.teams.pump.busy=25*60; tick(6);
+    radio('차수호','사칠. 1팀 출동, 현대아파트 3동. 6분.');
+  } else if(which==='rescue'){
+    me('구조대, 현대아파트 3동 301호. 70대 여성 단독 거주, 연기 냄새, 현관문 개방 불가. 출동. 사륙?');
+    S.teams.rescue.busy=25*60; tick(6);
+    radio('한이레','사칠. 구조대 출동. 몇 명이에요?');
+    me('1명. 70대 여성. 혼자.');
+    radio('한이레','알겠어요. 9분.');
+  } else {
+    me('구급 1, 현대아파트 3동 301호. 확인 출동.');
+    S.teams.amb.busy=25*60; tick(6);
+    radio('구급 1','구급 1 이동. 8분.');
+  }
+  drawTeams();
+  me('할머니, 소방차 출동시켰습니다. 끊지 마시고요. 모르는 번호로 전화 오면 저희니까 꼭 받으세요.');
+  await resolve4(which,false);
+}
+async function resolve4(which,late){
+  // 결과 — 누가 갔나 · 얼마나 늦었나 · 안내했나 · 구급이 있었나
+  let tier = which==='pump'?0 : which==='rescue'?1 : 2;
+  if(late) tier+=1;
+  if(!S.c4.guided) tier+=1;
+  if(!late && (S.c4.n>=3 || S.c4.waited>=75)) tier+=1;
+  if(S.teams.amb.busy>0 && which!=='amb' && S.c3.dispatched==='amb') tier+=1;   // 구급이 장난전화에 가 있다
+  tier=Math.min(tier,3); S.c4.tier=tier;
+  const eta = which==='pump'?6 : which==='rescue'?9 : 8;
+  await wait(900); tick(eta*60-60);
+  if(!late) await type('caller','신고자', tier<=1?'(기침) 소리가… 사이렌 소리가 들려요':'(기침이 잦아든다) … (아주 작게) 여보세요…');
+  tick(60);
+  const who = which==='pump'?'차수호' : which==='rescue'?'한이레' : '구급 1';
+  const unit = which==='pump'?'1팀' : which==='rescue'?'구조대' : '구급 1';
+  if(which==='amb'){
+    radio(who,'구급 1 현장 도착. 3층 복도 농연, 진입 불가. 펌프 지원 요청합니다.');
+    await wait(800); tick(90);
+    const t2 = S.teams.pump.busy>0?'rescue':'pump';
+    S.teams[t2].busy=25*60; drawTeams();
+    radio(t2==='pump'?'차수호':'한이레',(t2==='pump'?'1팀':'구조대')+' 현장 도착. 301호 진입, 인명검색.');
+  } else {
+    radio(who, unit+' 현장 도착. 3층 복도 농연, 301호 현관 파괴 개방. 인명검색 실시.');
+  }
+  await wait(900); tick(70);
+  const lines=[
+    '요구조자 1명 확보. 의식 명료. 문틈에 젖은 수건. 연기 흡입 경미 — 구급 인계. 주방 화재 초진.',
+    '요구조자 1명 확보. 의식 있음, 반응 느림. 연기 흡입 — 구급 인계, 중상. 주방 화재 초진.',
+    '요구조자 1명 확보. 의식 없음, 호흡 있음. 구급 인계 — 위중. 초진 중.',
+    '요구조자 1명 확보. 호흡 없음. 심폐소생 시작. … 구급 인계. 맥박 돌아왔습니다. 병원에서 연락 준답니다. 초진 중.'
+  ];
+  radio(which==='amb'?(S.teams.pump.busy>0&&S.c3.dispatched!=='pump'?'한이레':'차수호'):who, lines[tier]);
+  if(!late) sys('L2 통화 종료');
+  await wait(800);
+  if(S.c3.dispatched==='pump'){
+    await wait(400);
+    radio('차수호','1팀 현장 도착. 체육관 화재 징후 없음. 문 잠겨 있음. 운동장에 아무도 없음. 복귀합니다.');
+    await wait(900);
+    await yun('최초보고 취소해. 허위신고 과태료 건으로 올려. — 네 잘못은 아니야. 3번 조항대로 했어.');
+  } else if(S.c3.dispatched==='amb'){
+    await wait(400);
+    radio('구급 1','구급 1 남천중 도착. 화재 없음. 복귀합니다.');
+    await wait(900);
+    await yun('화재 신고에 구급을 보냈어? 3번 조항은 펌프야.');
+  } else {
+    await yun(tier<=1?'다음.':(late?'냄새가 난댔지. 비긴급으로 분류한 건 너야. 녹취 들을 거야.':'…다음.'));
+  }
+  await wait(700);
+  opts([{k:'기록', t:'근무 기록 보기', act:true, f:report}],'03:52 이후는 슬라이스에 없습니다');
+}
+
+/* ================= 리포트 ================= */
+function report(){
+  S.phase='report'; beepLoop(false);
+  const c3=S.c3, c4=S.c4;
+  const c3ok=c3.decision==='hold';
+  const held4=c4.dispatched[0]==='hold';
+  const tierName=['경상','중상','위중','심정지 → 소생'][c4.tier];
+  const teamName={pump:'1팀 6분 도착',rescue:'구조대 9분 도착',amb:'구급 확인 후 본대 요청 — 지연',hold:'이웃 신고로 11분 뒤 출동'}[c4.dispatched[0]];
+  const carry=[];
+  carry.push('301호 할머니 — <b>'+tierName+'</b>'+(c4.tier>=2?' (예후는 다음 밤에 연락이 온다)':''));
+  if(c3.dispatched==='pump') carry.push('허위신고 1건 — <b>과태료 의뢰</b>(소방기본법 56조, 1회 200만 원). 규정상 당신 잘못은 아니다. 1팀이 비어 있던 25분은 기록에 남지 않는다');
+  else if(c3.dispatched==='amb') carry.push('화재 신고에 구급 확인 출동 — 3번 조항 위반 메모. 윤 주임이 기억한다');
+  else carry.push('화재 신고 보류 — <b>3번 조항 예외 처리</b>. 맞았으니 기록만 남는다. 틀렸다면 달랐다');
+  if(held4) carry.push('화재를 비긴급으로 분류 — <b>3번·4번 조항 위반</b>. 녹취 3개월 보관. 감사에서 다시 듣게 된다');
+  carry.push('임볕 — 첫 야간 출동 '+(c3.dispatched==='pump'?'2회 (한 번은 헛걸음)':'1회'));
+
+  const askedWhy=c3.asked.includes('why');
+  const replay3 = c3ok ? '' :
+    '<h3>다시 듣기 — 3번 통화</h3><div class="replay">'+
+    (c3.asked.includes('fire')?'<div><span class="t">0:46</span>"위쪽 창문에서요. <mark>2층… 아, 체육관은 1층이죠</mark>" — 현장에 있는 사람은 층수를 고치지 않는다</div>':'<div><span class="t">—</span>층수를 물었다면: 체육관 층수를 틀렸을 것이다</div>')+
+    (askedWhy?'<div><span class="t">1:02</span>"친구들이랑 <mark>농구</mark>요. (뒤에서 누가 뭐라고 한다) 아니, <mark>지나가다가</mark>요" — 밤 11시에</div>':'<div><span class="t">—</span><mark>묻지 않은 질문</mark>: "이 시간에 거기서 뭐 하고 계셨어요?" — 가장 빨리 갈리는 질문이었다</div>')+
+    '<div><span class="t">1:20</span><mark>(아주 작게 다른 목소리: "야, 됐어")</mark> — 됐어, 는 끝났다는 뜻이다</div>'+
+    '<div style="margin-top:8px;color:var(--text)">이름을 또박또박 댄 것이 당신을 붙잡았을 것이다. 장난은 연습하면 늘어난다. 그리고 규정은 보내라고 했다 — 보낸 것은 틀리지 않았다. 비어 있던 25분이 문제였을 뿐.</div></div>';
+  const replay4 = held4 ?
+    '<h3>다시 듣기 — 4번 통화</h3><div class="replay">'+
+    '<div><span class="t">0:38</span>"불은 안 보여요. <mark>괜히 전화했나</mark> 모르겠네" — 2번 통화와 똑같이 들렸다</div>'+
+    (c4.n>=2?'<div><span class="t">1:10</span><mark>(말끝에 작게 기침)</mark> — 있었다</div>':'<div><span class="t">—</span>한 번만 더 물었다면 <mark>기침</mark>이 섞였을 것이다</div>')+
+    '<div style="margin-top:8px;color:var(--text)">냄새만 난다는 노인의 전화. 4번 조항은 비긴급을 허락한다 — 인명 우려가 없을 때만. 혼자 사는 70대가 연기 냄새를 맡고 전화했다. 그것이 우려가 아니면 무엇이 우려인가.</div></div>' : '';
+
+  $('#repBody').innerHTML=
+    '<h3>통화 기록</h3><table>'+
+    '<tr><td>23:05</td><td>L1 · 남천중 체육관 화재 신고<br><span class="truth">진실: 허위 (중학생 3명, 연습한 장난)</span><br>판단: '+
+      (c3ok?'<span class="good">보류 (규정 예외, 결과적으로 정답)</span>':c3.dispatched==='amb'?'<span class="bad">구급 확인 출동 — 구급 25분 부재</span>':'<span class="bad">1팀 출동 — 규정대로. 헛걸음 25분</span>')+'</td></tr>'+
+    '<tr><td>'+clockStr(S.l2wait||S.t).slice(0,5)+'</td><td>L2 · 현대아파트 301호<br><span class="truth">진실: 화재 (주방 발화, 연기 흡입)</span><br>결과: <span class="'+(c4.tier<=1?'good':'bad')+'">'+tierName+'</span> — '+teamName+
+      (c3.dispatched==='pump'&&c4.dispatched[0]!=='pump'?' <span class="bad">(1팀 부재)</span>':'')+
+      (c4.guided?' · 안내 있음':' · <span class="bad">대처 안내 없음</span>')+
+      (!held4&&c4.n>=3?' · <span class="bad">확신을 기다림 — 질문 '+c4.n+'회</span>':'')+
+      (c4.waited>=75?' · <span class="bad">대기 '+Math.round(c4.waited)+'초</span>':' · 대기 '+Math.round(c4.waited)+'초')+'</td></tr></table>'+
+    replay3+replay4+
+    '<h3>밤 2로 넘어가는 것</h3><ul class="carry">'+carry.map(c=>'<li>'+c+'</li>').join('')+'</ul>'+
+    '<h3>윤 주임</h3><div>'+(held4?'"3번 조항. 목소리만 듣고 단정하지 말라고 써 있어. 읽어봤어?"':c3.dispatched==='pump'?(c4.tier>=2?'"규정대로 했어. 그게 위로가 되면."':'"보고서 마저 써."'):(c4.tier<=1?'"…"':'"안내는 왜 안 했어."'))+'</div>';
+  $('#ovReport').classList.add('on');
+}
+
+/* ================= 시작 · 초기화 ================= */
+function reset(){
+  S.t=23*3600+5*60+10; S.l2wait=null; S.phase='intro'; S.radio=[]; S.unread=false;
+  Object.values(S.teams).forEach(tm=>tm.busy=0);
+  S.c3={asked:[], decision:null, dispatched:null};
+  S.c4={asked:[], guided:false, dispatched:[], waited:0, tier:null, n:0};
+  beepLoop(false);
+  $('#pane-call').innerHTML=''; $('#radioBody').innerHTML=''; $('#opts').innerHTML=''; $('#hint').textContent='';
+  setLine('l1',''); setLine('l2','');
+  $('#clock').textContent=clockStr(S.t);
+  document.querySelector('nav button[data-tab=radio]').classList.remove('dot');
+  document.querySelector('nav button[data-tab=call]').click();
+  $('#ovReport').classList.remove('on'); $('#ovIntro').classList.add('on');
+  drawTeams();
+}
+$('#btnAgain').onclick=reset;
+$('#btnStart').onclick=()=>{ audioInit(); $('#ovIntro').classList.remove('on'); drawTeams(); call3(); };
+addEventListener('keydown',e=>{ if(e.code==='Enter'&&$('#ovIntro').classList.contains('on')) $('#btnStart').click(); });
+drawTeams();
+
+window.__dev={S, click(i){ const b=document.querySelectorAll('#opts .opt')[i]; if(b&&!b.disabled){ b.click(); return true;} return false; },
+  labels(){ return [...document.querySelectorAll('#opts .opt')].map(b=>(b.disabled?'[x] ':'')+b.textContent.trim()); },
+  start(){ S.fast=true; $('#btnStart').click(); }, reset, report:()=>$('#repBody').innerText };
+})();
+</script>
+</body>
+</html>

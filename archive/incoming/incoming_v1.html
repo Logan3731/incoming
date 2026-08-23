@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>수신 중 — 슬라이스</title>
+<style>
+  :root{
+    --ground:#0E0D0C; --panel:#151312; --line:#2A2520;
+    --bone:#E3E9EA; --text:#B8BFC1; --dim:#717878; --faint:#474D4E;
+    --ember:#E4552B; --teal:#5FC9CF; --gold:#F2C94C;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;background:var(--ground);overflow:hidden;
+    font-family:var(--sans);color:var(--text);-webkit-font-smoothing:antialiased;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #stage{position:absolute;top:0;left:0;width:620px;height:1060px;transform-origin:top left;
+    display:flex;flex-direction:column;background:var(--ground)}
+
+  /* ── 상단 계기 ── */
+  header{padding:22px 28px 12px;border-bottom:1px solid var(--line)}
+  .row1{display:flex;align-items:baseline;justify-content:space-between}
+  #clock{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--bone);letter-spacing:.04em}
+  .lines{display:flex;gap:18px;font-family:var(--mono);font-size:12px}
+  .ln{display:flex;align-items:center;gap:7px;color:var(--faint)}
+  .ln i{width:9px;height:9px;border-radius:50%;background:var(--faint);display:inline-block}
+  .ln.live{color:var(--teal)} .ln.live i{background:var(--teal)}
+  .ln.wait{color:var(--ember)} .ln.wait i{background:var(--ember);animation:blink .9s steps(1) infinite}
+  @keyframes blink{50%{opacity:.15}}
+  .row2{display:flex;gap:8px;margin-top:12px;font-family:var(--mono);font-size:11px}
+  .team{padding:5px 10px;border:1px solid var(--line);color:var(--dim);letter-spacing:.06em}
+  .team.out{color:var(--ember);border-color:#4a2a22}
+  .team.ok{color:var(--teal);border-color:#23474a}
+
+  /* ── 탭 ── */
+  nav{display:flex;border-bottom:1px solid var(--line)}
+  nav button{flex:1;background:none;border:none;color:var(--faint);font-family:var(--mono);
+    font-size:12px;letter-spacing:.18em;padding:13px 0;cursor:pointer;border-bottom:2px solid transparent}
+  nav button.on{color:var(--bone);border-bottom-color:var(--teal)}
+  nav button.dot::after{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--ember);margin-left:6px;vertical-align:middle}
+
+  /* ── 본문 ── */
+  main{flex:1;overflow-y:auto;padding:22px 28px;scroll-behavior:smooth}
+  .pane{display:none} .pane.on{display:block}
+  .msg{margin-bottom:14px;line-height:1.75;font-size:16px;max-width:540px}
+  .msg .who{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--faint);display:block;margin-bottom:2px}
+  .msg.caller{color:var(--bone)}
+  .msg.me{color:var(--teal)}
+  .msg.sys{color:var(--dim);font-family:var(--mono);font-size:12.5px;letter-spacing:.04em}
+  .msg.radio{color:var(--text);font-family:var(--mono);font-size:13.5px;border-left:2px solid var(--line);padding-left:12px}
+  .msg.radio .who{color:var(--ember)}
+  .msg.yun{color:var(--text)} .msg.yun .who{color:var(--gold)}
+  .cue{color:var(--dim);font-style:italic}
+  .cur{display:inline-block;width:8px;height:16px;background:var(--bone);vertical-align:-2px;animation:blink .7s steps(1) infinite}
+  .manual li{margin:0 0 12px 0;padding-left:30px;position:relative;line-height:1.6;font-size:15px}
+  .manual li b{position:absolute;left:0;font-family:var(--mono);color:var(--ember)}
+  .res{font-family:var(--mono);font-size:13px;line-height:2.2}
+  .res b{color:var(--bone);font-weight:600}
+  .res .out{color:var(--ember)} .res .ok{color:var(--teal)}
+
+  /* ── 행동 ── */
+  footer{border-top:1px solid var(--line);padding:14px 20px 22px;min-height:150px}
+  .hint{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--faint);margin:0 8px 10px}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{background:var(--panel);border:1px solid var(--line);color:var(--text);text-align:left;
+    font-family:inherit;font-size:15px;padding:13px 16px;cursor:pointer;display:flex;gap:12px;align-items:center}
+  .opt:active{background:#1d1a18}
+  .opt .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ember);flex:none;width:48px}
+  .opt.act .k{color:var(--teal)}
+  .opt:disabled{opacity:.35;cursor:default}
+  .optrow{display:flex;gap:8px}
+  .optrow .opt{flex:1;justify-content:center}
+
+  /* ── 오버레이 ── */
+  .overlay{position:absolute;inset:0;background:var(--ground);display:none;flex-direction:column;
+    padding:60px 44px;overflow-y:auto}
+  .overlay.on{display:flex}
+  h1{font-size:56px;letter-spacing:.3em;text-indent:.3em;font-weight:800;color:var(--bone);line-height:1;text-align:center}
+  .tag{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--ember);text-align:center;margin-top:16px}
+  .brief{margin:40px auto 0;max-width:440px;font-size:15px;line-height:1.95}
+  .brief p{margin-bottom:16px}
+  .brief b{color:var(--bone)}
+  .btn{display:block;margin:38px auto 0;border:none;background:transparent;color:var(--teal);font-family:inherit;
+    font-size:19px;font-weight:800;letter-spacing:.12em;padding:19px 52px;cursor:pointer;
+    background-image:linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal));
+    background-repeat:no-repeat;
+    background-size:16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px;
+    background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom}
+  .btn:disabled{color:var(--faint);opacity:.5}
+  h2{font-size:26px;font-weight:800;color:var(--bone);letter-spacing:.04em}
+  .rep{max-width:520px;margin:28px auto 0;font-size:14.5px;line-height:1.8}
+  .rep h3{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--ember);margin:26px 0 10px}
+  .rep table{width:100%;border-collapse:collapse;font-size:14px}
+  .rep td{padding:9px 6px;border-top:1px solid var(--line);vertical-align:top}
+  .rep td:first-child{font-family:var(--mono);color:var(--dim);width:64px}
+  .rep .truth{color:var(--bone);font-weight:700}
+  .rep .bad{color:var(--ember)} .rep .good{color:var(--teal)}
+  .replay{font-family:var(--mono);font-size:13px;color:var(--dim);line-height:1.9}
+  .replay mark{background:none;color:var(--ember);font-weight:700}
+  .replay .t{color:var(--faint);margin-right:10px}
+  .carry li{margin-left:18px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <header>
+    <div class="row1">
+      <div id="clock">23:05:10</div>
+      <div class="lines">
+        <span class="ln" id="l1"><i></i>L1</span>
+        <span class="ln" id="l2"><i></i>L2</span>
+      </div>
+    </div>
+    <div class="row2" id="teams"></div>
+  </header>
+  <nav>
+    <button class="on" data-tab="call">통화</button>
+    <button data-tab="manual">매뉴얼</button>
+    <button data-tab="res">자원</button>
+    <button data-tab="radio">무전</button>
+  </nav>
+  <main>
+    <div class="pane on" id="pane-call"></div>
+    <div class="pane" id="pane-manual">
+      <ol class="manual">
+        <li><b>1.</b> 접수 순서: 위치 → 상황 → 인명</li>
+        <li><b>2.</b> 위치 미확인 시 출동 불가</li>
+        <li><b>3.</b> 화재 징후(불꽃·연기·열) 진술이 없으면 출동 보류 가능. 확인 질문을 우선한다</li>
+        <li><b>4.</b> 허위 의심 시 보류 후 재접수 대기</li>
+        <li><b>5.</b> 가용 자원: 펌프 1팀 · 구조대 1 · 구급 1. 출동 후 복귀까지 약 25분</li>
+        <li><b>6.</b> 미발생 사건 예고·협박성 신고 → 경찰 이첩</li>
+      </ol>
+    </div>
+    <div class="pane" id="pane-res"><div class="res" id="resBody"></div></div>
+    <div class="pane" id="pane-radio"><div id="radioBody"></div></div>
+  </main>
+  <footer>
+    <div class="hint" id="hint"></div>
+    <div class="opts" id="opts"></div>
+  </footer>
+
+  <div class="overlay on" id="ovIntro">
+    <h1>수신 중</h1>
+    <div class="tag">밤 1 · 슬라이스 — 3번과 4번 전화</div>
+    <div class="brief">
+      <p>22시에 두 건을 처리했다. 주택 화재 하나, 고기 굽는 연기 하나.<br>
+      옆자리의 <b>윤 주임</b>은 두 번째 통화가 끝난 뒤로 한마디도 하지 않았다.</p>
+      <p><b>질문 하나에 시간이 간다.</b> 두 번째 라인이 깜빡이면, 그게 무엇이든 기다리고 있는 것이다.</p>
+      <p>펌프 1팀은 차고에 돌아와 있다. 차수호, 마도수, 그리고 오늘 첫 출동을 다녀온 임볕.</p>
+      <p class="cue">23시 5분. 벨이 울린다.</p>
+    </div>
+    <button class="btn" id="btnStart">받는다</button>
+  </div>
+
+  <div class="overlay" id="ovReport">
+    <h2 id="repTitle">밤 1 — 근무 기록</h2>
+    <div class="rep" id="repBody"></div>
+    <button class="btn" id="btnAgain">다른 선택으로 다시</button>
+    <button class="btn" disabled style="margin-top:14px">밤 2로 <small style="font-family:var(--mono);font-size:11px;opacity:.6"> — 슬라이스에는 없습니다</small></button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const stage=$('#stage');
+function fit(){ const s=Math.min(innerWidth/620, innerHeight/1060);
+  stage.style.transform='translate('+((innerWidth-620*s)/2)+'px,'+((innerHeight-1060*s)/2)+'px) scale('+s+')'; }
+addEventListener('resize',fit); fit();
+
+/* ================= 상태 ================= */
+const S={
+  t:23*3600+5*60+10,           // 23:05:10
+  fast:false,                   // 테스트용 — 타이핑 생략
+  teams:{ pump:{name:'1팀', crew:'차수호·마도수·임볕', busy:0}, rescue:{name:'구조대', crew:'한이레·도강', busy:0}, amb:{name:'구급', crew:'', busy:0} },
+  l2wait:null,                  // 2번 라인이 깜빡이기 시작한 시각
+  c3:{asked:[], decision:null, dispatched:null},
+  c4:{asked:[], guided:false, dispatched:[], waited:0, tier:null},
+  radio:[], unread:false, phase:'intro'
+};
+const pad=n=>String(n).padStart(2,'0');
+const clockStr=t=>pad(Math.floor(t/3600)%24)+':'+pad(Math.floor(t/60)%60)+':'+pad(t%60);
+function tick(sec){ S.t+=sec; $('#clock').textContent=clockStr(S.t);
+  Object.values(S.teams).forEach(tm=>{ if(tm.busy>0) tm.busy=Math.max(0,tm.busy-sec); });
+  drawTeams(); }
+function drawTeams(){
+  $('#teams').innerHTML=Object.values(S.teams).map(tm=>
+    '<span class="team '+(tm.busy>0?'out':'ok')+'">'+tm.name+(tm.busy>0?' 출동중 '+Math.ceil(tm.busy/60)+'분':' 대기')+'</span>').join('');
+  $('#resBody').innerHTML=Object.values(S.teams).map(tm=>
+    '<b>'+tm.name+'</b> '+(tm.crew?'— '+tm.crew:'')+'<br>'+(tm.busy>0?'<span class="out">출동 중 · 복귀까지 '+Math.ceil(tm.busy/60)+'분</span>':'<span class="ok">차고 대기</span>')+'<br><br>').join('');
+}
+function setLine(id,cls){ const el=$('#'+id); el.className='ln '+(cls||''); }
+
+/* ================= 탭 ================= */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); $('#pane-'+b.dataset.tab).classList.add('on');
+  if(b.dataset.tab==='radio'){ b.classList.remove('dot'); S.unread=false; }
+});
+
+/* ================= 출력 ================= */
+const pane=$('#pane-call');
+function scrollDown(){ const m=$('main'); m.scrollTop=m.scrollHeight; }
+function line(cls,who,html){
+  const d=document.createElement('div'); d.className='msg '+cls;
+  d.innerHTML=(who?'<span class="who">'+who+'</span>':'')+html;
+  pane.appendChild(d); scrollDown(); return d;
+}
+/* 타이핑 — 괄호 속은 배경음 */
+function type(cls,who,text){
+  if(S.fast){   // 테스트 모드 — 타이머 없이 즉시
+    line(cls,who,text.replace(/(\([^)]*\))/g,'<span class="cue">$1</span>'));
+    return Promise.resolve();
+  }
+  return new Promise(res=>{
+    const d=line(cls,who,'');
+    const body=document.createElement('span'); d.appendChild(body);
+    const cur=document.createElement('span'); cur.className='cur'; d.appendChild(cur);
+    const parts=text.split(/(\([^)]*\))/);
+    let html='', i=0, j=0;
+    function step(){
+      if(i>=parts.length){ cur.remove(); res(); return; }
+      const p=parts[i];
+      if(p.startsWith('(')){ html+='<span class="cue">'+p+'</span>'; i++; j=0; body.innerHTML=html; scrollDown();
+        setTimeout(step,S.fast?0:260); return; }
+      if(j<p.length){ html+=p[j]; j++; body.innerHTML=html; scrollDown();
+        const ch=p[j-1]; setTimeout(step,S.fast?0:(ch==='…'?220:/[.?!]/.test(ch)?160:32)); }
+      else { i++; j=0; step(); }
+    }
+    step();
+  });
+}
+const me=t=>line('me','나',t);
+const sys=t=>line('sys','',t);
+const yun=t=>type('yun','윤 주임',t);
+function radio(who,t){
+  const stamp=clockStr(S.t).slice(0,5);
+  S.radio.push({stamp,who,t});
+  $('#radioBody').innerHTML=S.radio.map(r=>'<div class="msg radio"><span class="who">'+r.stamp+' · '+r.who+'</span>'+r.t+'</div>').join('');
+  const nb=document.querySelector('nav button[data-tab=radio]');
+  if(!nb.classList.contains('on')){ nb.classList.add('dot'); S.unread=true; }
+  return line('radio',null,'<span class="who">'+stamp+' · '+who+'</span>'+t);
+}
+function opts(list,hint){
+  $('#hint').textContent=hint||'';
+  const box=$('#opts'); box.innerHTML='';
+  list.forEach(o=>{
+    const b=document.createElement('button'); b.className='opt'+(o.act?' act':'');
+    b.innerHTML='<span class="k">'+o.k+'</span>'+o.t;
+    if(o.disabled) b.disabled=true;
+    b.onclick=()=>{ box.innerHTML=''; $('#hint').textContent=''; o.f(); };
+    box.appendChild(b);
+  });
+}
+const wait=ms=>S.fast?Promise.resolve():new Promise(r=>setTimeout(r,ms));
+
+/* ================= 3번 전화 — 장난 ================= */
+async function call3(){
+  S.phase='c3';
+  setLine('l1','live');
+  sys('23:05:10 · L1 수신 — 발신 010-****-3317');
+  await type('caller','신고자','저기요 불났어요 학교에 불났어요 빨리요');
+  c3menu();
+}
+function c3menu(){
+  const a=S.c3.asked;
+  const qs=[
+    {id:'where', k:'질문', t:'어느 학교입니까?', f:async()=>{ me('어느 학교입니까?'); tick(24);
+      await type('caller','신고자','어… 남천중학교요 (뒤에서 짧게 킥, 하고 막는 소리)'); after('where'); }},
+    {id:'fire', k:'질문', t:'불이 어디서 보입니까?', f:async()=>{ me('불이 어디서 보입니까? 불꽃입니까, 연기입니까?'); tick(22);
+      await type('caller','신고자','그냥 막 다 타요 빨리 와요 (작게 웅성거림)'); after('fire'); }},
+    {id:'inside', k:'질문', t:'지금 학교 안에 계세요?', f:async()=>{ me('지금 학교 안에 계십니까?'); tick(26);
+      await type('caller','신고자','(정적) 네… 아니 밖이요. 동천중학교 앞이요'); after('inside'); }},
+    {id:'name', k:'질문', t:'성함과 연락처를 말씀해 주세요', f:async()=>{ me('신고자 성함과 연락처를 말씀해 주십시오.'); tick(20);
+      await type('caller','신고자','아 그게 왜 필요해요 빨리 오라고요 (누군가 "야 끊어" 하고 속삭임)'); after('name'); }},
+  ].filter(q=>!a.includes(q.id));
+  const acts=[
+    {k:'출동', t:'1팀 출동 지령 — 남천중학교', act:true, f:()=>c3decide('dispatch')},
+    {k:'보류', t:'허위 의심 — 보류 후 재접수 대기', act:true, f:()=>c3decide('hold')},
+  ];
+  opts([...qs.slice(0,3),...acts], a.length?'질문 '+a.length+'회 · 매뉴얼 3·4 참조':'위치 → 상황 → 인명');
+}
+async function after(id){
+  S.c3.asked.push(id);
+  if(S.c3.asked.length===2 && !S.l2wait){
+    S.l2wait=S.t; setLine('l2','wait');
+    sys('L2 수신 대기 — 발신 010-****-0082');
+  }
+  if(S.c3.asked.length>=3){
+    await wait(500);
+    await type('caller','신고자','(킥킥거리는 소리, 그리고) 뚜— 뚜—');
+    sys('L1 통화 종료 — 상대방 끊음');
+    setLine('l1','');
+    opts([
+      {k:'출동', t:'1팀 출동 지령 — 남천중학교', act:true, f:()=>c3decide('dispatch')},
+      {k:'보류', t:'허위 판단 — 기록 후 종료', act:true, f:()=>c3decide('hold')},
+    ],'상대가 끊었다. 판단은 남아 있다');
+    return;
+  }
+  c3menu();
+}
+async function c3decide(d){
+  S.c3.decision=d;
+  setLine('l1','');
+  if(d==='dispatch'){
+    me('1팀, 남천중학교 화재 신고. 출동.');
+    S.teams.pump.busy=25*60; S.c3.dispatched='pump'; tick(8);
+    radio('차수호','1팀 출동. 남천중 방면.');
+    await wait(700);
+    radio('임볕','(숨소리) 1팀 후속, 출동합니다.');
+  } else {
+    me('허위 의심. 보류 기록.'); tick(6);
+    await yun('됐어. 받아.');
+  }
+  drawTeams();
+  await wait(600);
+  call4();
+}
+
+/* ================= 4번 전화 — 진짜 ================= */
+async function call4(){
+  S.phase='c4';
+  S.c4.waited = S.l2wait ? (S.t - S.l2wait) : 0;
+  setLine('l2','live');
+  sys(clockStr(S.t)+' · L2 연결 — 대기 '+Math.round(S.c4.waited)+'초');
+  await type('caller','신고자','(기침) 여보세요… 연기가… 연기가 나요 (기침)');
+  c4menu();
+}
+function c4menu(){
+  const a=S.c4.asked;
+  const qs=[
+    {id:'where', k:'질문', t:'지금 계신 곳이 어디입니까?', f:async()=>{ me('지금 계신 곳이 어디입니까? 동, 호수 말씀해 주세요.'); tick(28);
+      await type('caller','신고자','남천동… 현대아파트 3동… 301호… (기침) 문이 뜨거워서 못 열겠어요'); after4('where'); }},
+    {id:'fire', k:'질문', t:'불이 보입니까?', f:async()=>{ me('불꽃이 보입니까?'); tick(18);
+      await type('caller','신고자','안 보여요, 연기만… 문 틈으로… 까매요 (기침)'); after4('fire'); }},
+    {id:'alone', k:'질문', t:'혼자 계십니까?', f:async()=>{ me('집에 혼자 계십니까?'); tick(16);
+      await type('caller','신고자','네… 혼자… 딸은 서울에… (기침)'); after4('alone'); }},
+  ].filter(q=>!a.includes(q.id));
+  const acts=[];
+  if(!S.c4.guided) acts.push({k:'안내', t:'젖은 수건으로 문틈을 막고, 낮게 엎드리세요', act:true, f:guide});
+  if(a.includes('where')){
+    const p=S.teams.pump, r=S.teams.rescue;
+    acts.push({k:'출동', t:(p.busy>0?'1팀 — 출동 중 (복귀 '+Math.ceil(p.busy/60)+'분)':'1팀 출동 — 현대아파트 3동'), act:true, disabled:p.busy>0, f:()=>dispatch4('pump')});
+    acts.push({k:'출동', t:'구조대 + 구급 출동 — 현대아파트 3동', act:true, f:()=>dispatch4('rescue')});
+  } else {
+    acts.push({k:'출동', t:'출동 지령 — 위치 미확인', act:true, disabled:true, f:()=>{}});
+  }
+  opts([...qs,...acts], a.includes('where')?'위치 확인됨 · 매뉴얼 1':'매뉴얼 2 — 위치 먼저');
+}
+async function after4(id){ S.c4.asked.push(id); c4menu(); }
+async function guide(){
+  S.c4.guided=true;
+  me('할머니, 제 말 들리세요. 수건을 물에 적셔서 문틈을 막으세요. 그리고 바닥에 낮게 엎드리세요. 연기는 위로 갑니다.');
+  tick(34);
+  await type('caller','신고자','수건… 네… (물 소리) (한참) 했어요… (기침) 엎드렸어요');
+  me('잘하셨어요. 끊지 마세요. 계속 말씀하세요.');
+  c4menu();
+}
+async function dispatch4(which){
+  S.c4.dispatched.push(which);
+  setLine('l2','');
+  if(which==='pump'){
+    me('1팀, 현대아파트 3동 301호. 연기 흡입 요구조자 1명. 출동.');
+    S.teams.pump.busy=25*60; tick(6);
+    radio('차수호','1팀 출동. 현대아파트 3동. 6분.');
+  } else {
+    me('구조대, 구급. 현대아파트 3동 301호. 연기 흡입 요구조자 1명, 문 개방 불가. 출동.');
+    S.teams.rescue.busy=25*60; S.teams.amb.busy=25*60; tick(6);
+    radio('한이레','구조대 출동. 몇 명이에요?');
+    me('1명. 70대 여성. 혼자.');
+    radio('한이레','알겠어요. 9분.');
+  }
+  drawTeams();
+  me('할머니, 지금 가고 있어요. 끊지 마시고요.');
+  await resolve4(which);
+}
+async function resolve4(which){
+  // 결과 — 도착 시간 · 안내 여부 · 기다린 시간이 결정한다
+  let tier = which==='pump'?0:1;          // 1팀이 가까움
+  if(!S.c4.guided) tier+=1;
+  if(S.c4.waited>=75) tier+=1;
+  tier=Math.min(tier,3); S.c4.tier=tier;
+  const eta=which==='pump'?6:9;
+  await wait(900); tick(eta*60-60);
+  await type('caller','신고자', tier<=1?'(기침) 소리가… 사이렌 소리가 들려요':'(기침이 잦아든다) … (아주 작게) 여보세요…');
+  tick(60);
+  const who=which==='pump'?'차수호':'한이레';
+  radio(who, (which==='pump'?'1팀':'구조대')+' 3동 도착. 301호 진입.');
+  await wait(900); tick(70);
+  const lines=[
+    '요구조자 1명 확보. 의식 명료. 문틈에 젖은 수건. 연기 흡입 경미 — 구급 이송.',
+    '요구조자 1명 확보. 의식 있음, 반응 느림. 연기 흡입 — 구급 이송, 중상.',
+    '요구조자 1명 확보. 의식 없음. 호흡 있음. 구급 인계 — 위중.',
+    '요구조자 1명 확보. 호흡 없음. 심폐소생 시작. … 구급 인계. 맥박 돌아왔습니다. 병원에서 연락 준답니다.'
+  ];
+  radio(who, lines[tier]);
+  sys('L2 통화 종료');
+  await wait(800);
+  if(S.c3.dispatched){
+    await wait(400);
+    radio('차수호','1팀 남천중 도착. 화재 징후 없음. 교문 앞 학생 셋 도주. 복귀합니다.');
+    await wait(900);
+    await yun('(아무 말 없이 경위서 양식을 책상 위에 올려놓는다)');
+  } else {
+    await yun(tier<=1?'다음.':'…다음.');
+  }
+  await wait(700);
+  opts([{k:'기록', t:'근무 기록 보기', act:true, f:report}],'03:52 이후는 슬라이스에 없습니다');
+}
+
+/* ================= 리포트 ================= */
+function report(){
+  S.phase='report';
+  const c3=S.c3, c4=S.c4;
+  const c3ok=c3.decision==='hold';
+  const tierName=['경상','중상','위중','심정지 → 소생'][c4.tier];
+  const carry=[];
+  carry.push('301호 할머니 — <b>'+tierName+'</b>'+(c4.tier>=2?' (예후는 다음 밤에 연락이 온다)':''));
+  if(c3.dispatched) carry.push('허위 출동 1건 — <b>경위서</b>. 다음 밤 공문 예고: "허위 출동 건 관련 경위서 제출 바람"');
+  else carry.push('허위 신고 보류 — 기록됨. 윤 주임의 평가 없음');
+  carry.push('임볕 — 첫 야간 출동 '+(c3.dispatched?'2회 (한 번은 헛걸음)':'1회'));
+  $('#repBody').innerHTML=
+    '<h3>통화 기록</h3><table>'+
+    '<tr><td>23:05</td><td>L1 · 남천중 화재 신고<br><span class="truth">진실: 허위 (중학생 3명, 장난)</span><br>판단: '+(c3ok?'<span class="good">보류</span>':'<span class="bad">1팀 출동 — 헛걸음 25분</span>')+'</td></tr>'+
+    '<tr><td>'+clockStr(S.l2wait||S.t).slice(0,5)+'</td><td>L2 · 현대아파트 301호<br><span class="truth">진실: 화재 (주방 발화, 연기 흡입)</span><br>결과: <span class="'+(c4.tier<=1?'good':'bad')+'">'+tierName+'</span> — '+
+      (c4.dispatched[0]==='pump'?'1팀 6분 도착':'구조대 9분 도착'+(c3.dispatched?' <span class="bad">(1팀 부재)</span>':''))+
+      (c4.guided?' · 안내 있음':' · <span class="bad">대처 안내 없음</span>')+
+      (c4.waited>=75?' · <span class="bad">대기 '+Math.round(c4.waited)+'초</span>':' · 대기 '+Math.round(c4.waited)+'초')+'</td></tr></table>'+
+    (c3ok?'':'<h3>다시 듣기 — 3번 통화</h3><div class="replay">'+
+      '<div><span class="t">0:24</span>"남천중학교요" <mark>(뒤에서 짧게 킥, 하고 막는 소리)</mark></div>'+
+      '<div><span class="t">0:50</span>"…아니 밖이요. <mark>동천중학교</mark> 앞이요" — 학교 이름이 바뀜</div>'+
+      '<div><span class="t">1:10</span><mark>(누군가 "야 끊어" 하고 속삭임)</mark></div>'+
+      '<div style="margin-top:8px;color:var(--text)">단서는 세 번 있었다.</div></div>')+
+    '<h3>밤 2로 넘어가는 것</h3><ul class="carry">'+carry.map(c=>'<li>'+c+'</li>').join('')+'</ul>'+
+    '<h3>윤 주임</h3><div>'+(c3.dispatched?'"매뉴얼 4번. 읽어봤어?"':(c4.tier<=1?'"…"':'"안내는 왜 안 했어."'))+'</div>';
+  $('#ovReport').classList.add('on');
+}
+
+/* ================= 시작 · 초기화 ================= */
+function reset(){
+  S.t=23*3600+5*60+10; S.l2wait=null; S.phase='intro'; S.radio=[]; S.unread=false;
+  Object.values(S.teams).forEach(tm=>tm.busy=0);
+  S.c3={asked:[], decision:null, dispatched:null};
+  S.c4={asked:[], guided:false, dispatched:[], waited:0, tier:null};
+  $('#pane-call').innerHTML=''; $('#radioBody').innerHTML=''; $('#opts').innerHTML=''; $('#hint').textContent='';
+  setLine('l1',''); setLine('l2','');
+  $('#clock').textContent=clockStr(S.t);
+  document.querySelector('nav button[data-tab=radio]').classList.remove('dot');
+  document.querySelector('nav button[data-tab=call]').click();
+  $('#ovReport').classList.remove('on'); $('#ovIntro').classList.add('on');
+  drawTeams();
+}
+$('#btnAgain').onclick=reset;
+$('#btnStart').onclick=()=>{ $('#ovIntro').classList.remove('on'); drawTeams(); call3(); };
+addEventListener('keydown',e=>{ if(e.code==='Enter'&&$('#ovIntro').classList.contains('on')) $('#btnStart').click(); });
+drawTeams();
+
+window.__dev={S, click(i){ const b=document.querySelectorAll('#opts .opt')[i]; if(b&&!b.disabled){ b.click(); return true;} return false; },
+  labels(){ return [...document.querySelectorAll('#opts .opt')].map(b=>(b.disabled?'[x] ':'')+b.textContent.trim()); },
+  start(){ S.fast=true; $('#btnStart').click(); }, reset, report:()=>$('#repBody').innerText };
+})();
+</script>
+</body>
+</html>

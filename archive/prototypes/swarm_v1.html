@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>군집 — 프로토타입 v1</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;background:#07080c;overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #stage{position:absolute;top:0;left:0;width:620px;height:1060px;transform-origin:top left}
+  canvas{position:absolute;top:0;left:0;width:620px;height:1060px;display:block;touch-action:none}
+  .overlay{position:absolute;top:0;left:0;width:620px;height:1060px;display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(6,7,11,.86);color:#e8ecf4;padding:40px;text-align:center}
+  .overlay.on{display:flex}
+  h1{font-size:52px;letter-spacing:.22em;font-weight:800;margin-bottom:8px;color:#ffd98a}
+  h2{font-size:34px;font-weight:800;margin-bottom:22px;letter-spacing:.06em}
+  .sub{font-size:17px;line-height:1.85;color:#9aa4b8;margin-bottom:34px}
+  .sub b{color:#e8ecf4;font-weight:700}
+  .btn{border:1px solid #ffd98a;color:#ffd98a;background:transparent;border-radius:6px;
+    padding:16px 44px;font-size:19px;font-weight:700;letter-spacing:.1em;cursor:pointer;
+    font-family:inherit}
+  .btn:active{background:#ffd98a;color:#07080c}
+  .cards{display:flex;flex-direction:column;gap:14px;width:100%;max-width:420px}
+  .card{border:1px solid #2c3346;background:#101420;border-radius:8px;padding:20px 22px;
+    text-align:left;cursor:pointer}
+  .card:active{border-color:#ffd98a;background:#1a1f30}
+  .card .n{font-size:21px;font-weight:800;color:#ffd98a;margin-bottom:6px}
+  .card .d{font-size:15px;color:#9aa4b8;line-height:1.5}
+  .stat{font-size:16px;color:#9aa4b8;line-height:2;margin-bottom:30px}
+  .stat b{color:#e8ecf4;font-size:19px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv" width="620" height="1060"></canvas>
+
+  <div class="overlay on" id="ovTitle">
+    <h1>군집</h1>
+    <div class="sub" style="margin-bottom:44px">프로토타입 v1 · 재미 검증용</div>
+    <div class="sub">
+      <b>방향키 · WASD</b>로 움직입니다 (모바일은 화면을 끌기).<br>
+      공격은 자동. 강화 선택은 <b>1 · 2 · 3</b>.<br><br>
+      적은 당신이 아니라 <b>등대</b>를 노립니다.<br>
+      도망칠 수는 있지만, 등대가 무너지면 끝입니다.<br><br>
+      2분을 버티세요.
+    </div>
+    <button class="btn" id="btnStart">시작 <span style="opacity:.55;font-size:15px">(Enter)</span></button>
+  </div>
+
+  <div class="overlay" id="ovLevel">
+    <h2 id="lvTitle">레벨 2</h2>
+    <div class="sub" style="margin-bottom:26px">하나를 고르세요 · 키보드 <b>1 2 3</b></div>
+    <div class="cards" id="lvCards"></div>
+  </div>
+
+  <div class="overlay" id="ovEnd">
+    <h2 id="endTitle">등대가 무너졌다</h2>
+    <div class="stat" id="endStat"></div>
+    <button class="btn" id="btnAgain">한 번 더 <span style="opacity:.55;font-size:15px">(Enter)</span></button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const W=620, H=1060;
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const stage=document.getElementById('stage');
+const ovTitle=document.getElementById('ovTitle'), ovLevel=document.getElementById('ovLevel'), ovEnd=document.getElementById('ovEnd');
+
+function fit(){
+  const s=Math.min(innerWidth/W, innerHeight/H);
+  stage.style.transform='translate('+((innerWidth-W*s)/2)+'px,'+((innerHeight-H*s)/2)+'px) scale('+s+')';
+}
+addEventListener('resize',fit); fit();
+
+/* ---------- 상수 ---------- */
+const RUN_TIME=120;          // 한 판 길이(초). 웨이브 2개
+const LH={x:W/2, y:H*0.60, r:26};
+const MAXHP=100;
+
+/* ---------- 상태 ---------- */
+let S=null, running=false, last=0;
+
+function newState(){
+  return {
+    t:0, kills:0, leaks:0, level:1, xp:0, xpNeed:5,
+    hp:MAXHP,
+    px:W/2, py:H*0.60+120, pr:13, pspeed:255,
+    tx:W/2, ty:H*0.60+120, dragging:false,
+    fireT:0, fireInterval:0.40, dmg:1, shots:1, pierce:0,
+    magnet:85, beam:0, blast:0, beamAng:0,
+    spawnT:0,
+    enemies:[], bullets:[], orbs:[], fx:[]
+  };
+}
+
+/* ---------- 강화 ---------- */
+const UPGRADES=[
+  {n:'집중',      d:'사격 속도 +25%',              f:s=>s.fireInterval*=0.8},
+  {n:'예열',      d:'총알 피해 +1',                f:s=>s.dmg+=1},
+  {n:'경보',      d:'이동 속도 +15%',              f:s=>s.pspeed*=1.15},
+  {n:'분산',      d:'총알 1발 추가 (부채꼴)',       f:s=>s.shots+=1},
+  {n:'꿰뚫기',    d:'총알이 적을 1명 더 관통',      f:s=>s.pierce+=1},
+  {n:'등대 광선', d:'등대가 회전 광선을 쏜다',      f:s=>s.beam+=1},
+  {n:'수리',      d:'등대 내구도 30 회복',          f:s=>s.hp=Math.min(MAXHP,s.hp+30)},
+  {n:'자기장',    d:'경험치 흡수 범위 +70%',        f:s=>s.magnet*=1.7},
+  {n:'파동',      d:'적을 처치하면 작게 터진다',    f:s=>s.blast+=1}
+];
+
+/* ---------- 입력 ---------- */
+function toLocal(e){
+  const r=cv.getBoundingClientRect();
+  const sc=r.width/W;
+  return {x:(e.clientX-r.left)/sc, y:(e.clientY-r.top)/sc};
+}
+cv.addEventListener('pointerdown',e=>{ if(!S)return; cv.setPointerCapture(e.pointerId);
+  const p=toLocal(e); S.tx=p.x; S.ty=p.y; S.dragging=true; });
+cv.addEventListener('pointermove',e=>{ if(!S||!S.dragging)return;
+  const p=toLocal(e); S.tx=p.x; S.ty=p.y; });
+cv.addEventListener('pointerup',()=>{ if(S)S.dragging=false; });
+cv.addEventListener('pointercancel',()=>{ if(S)S.dragging=false; });
+
+/* 키는 e.code(자판 위치)로 읽는다 — 한글 입력 상태에서도 WASD가 그대로 동작 */
+const KMAP={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',
+            KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right'};
+const keys={up:false,down:false,left:false,right:false};
+addEventListener('keydown',e=>{
+  const k=KMAP[e.code];
+  if(k){ keys[k]=true; e.preventDefault(); if(S)S.dragging=false; return; }
+  if(e.code==='Enter'||e.code==='Space'){
+    e.preventDefault();
+    if(ovTitle.classList.contains('on')||ovEnd.classList.contains('on')) start();
+    return;
+  }
+  // 레벨업 화면에서 1·2·3으로 선택
+  if(ovLevel.classList.contains('on')){
+    const i={Digit1:0,Digit2:1,Digit3:2,Numpad1:0,Numpad2:1,Numpad3:2}[e.code];
+    const box=document.getElementById('lvCards');
+    if(i!==undefined && box.children[i]){ e.preventDefault(); box.children[i].click(); }
+  }
+});
+addEventListener('keyup',e=>{ const k=KMAP[e.code]; if(k){ keys[k]=false; e.preventDefault(); } });
+addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; });
+
+/* ---------- 진행 ---------- */
+document.getElementById('btnStart').onclick=start;
+document.getElementById('btnAgain').onclick=start;
+
+function start(){
+  S=newState(); ovTitle.classList.remove('on'); ovEnd.classList.remove('on'); ovLevel.classList.remove('on');
+  running=true; last=performance.now(); requestAnimationFrame(loop);
+}
+
+function showLevelUp(){
+  running=false;
+  document.getElementById('lvTitle').textContent='레벨 '+S.level;
+  const pool=UPGRADES.slice(), pick=[];
+  while(pick.length<3 && pool.length) pick.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  const box=document.getElementById('lvCards'); box.innerHTML='';
+  pick.forEach((u,i)=>{
+    const el=document.createElement('div'); el.className='card';
+    el.innerHTML='<div class="n"><span style="opacity:.45">'+(i+1)+'</span>&nbsp; '+u.n+'</div><div class="d">'+u.d+'</div>';
+    el.onclick=()=>{ u.f(S); ovLevel.classList.remove('on'); running=true; last=performance.now(); requestAnimationFrame(loop); };
+    box.appendChild(el);
+  });
+  ovLevel.classList.add('on');
+}
+
+function endRun(win){
+  running=false;
+  document.getElementById('endTitle').textContent = win ? '버텨냈다' : '등대가 무너졌다';
+  document.getElementById('endStat').innerHTML=
+    '버틴 시간 <b>'+S.t.toFixed(1)+'초</b><br>'+
+    '처치 <b>'+S.kills+'</b> · 레벨 <b>'+S.level+'</b><br>'+
+    '등대 내구도 <b>'+Math.max(0,Math.round(S.hp))+'</b> / '+MAXHP+'<br>'+
+    '뚫린 횟수 <b>'+S.leaks+'</b>';
+  ovEnd.classList.add('on');
+}
+
+/* ---------- 루프 ---------- */
+function loop(now){
+  if(!running) return;
+  let dt=(now-last)/1000; last=now;
+  if(dt>0.05) dt=0.05;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+
+function spawnEnemy(){
+  const side=Math.floor(Math.random()*4); let x,y;
+  if(side===0){x=Math.random()*W; y=-30;}
+  else if(side===1){x=Math.random()*W; y=H+30;}
+  else if(side===2){x=-30; y=Math.random()*H;}
+  else {x=W+30; y=Math.random()*H;}
+  const fast = S.t>45 && Math.random()<0.32;
+  S.enemies.push({x,y, r: fast?9:13, hp: fast?2:3, spd: fast?116:64, fast, a:0});
+}
+
+function update(dt){
+  S.t+=dt;
+  if(S.t>=RUN_TIME){ endRun(true); return; }
+
+  /* 이동 — 키보드가 우선, 없으면 드래그 */
+  const kx=(keys.right?1:0)-(keys.left?1:0), ky=(keys.down?1:0)-(keys.up?1:0);
+  if(kx||ky){
+    const kl=Math.hypot(kx,ky);              // 대각선이 빨라지지 않게 정규화
+    S.px+=kx/kl*S.pspeed*dt; S.py+=ky/kl*S.pspeed*dt;
+    S.tx=S.px; S.ty=S.py;                    // 마우스 목표를 현재 위치로 동기화
+  } else if(S.dragging){
+    const dx=S.tx-S.px, dy=S.ty-S.py, dl=Math.hypot(dx,dy);
+    if(dl>2){ const step=Math.min(S.pspeed*dt, dl); S.px+=dx/dl*step; S.py+=dy/dl*step; }
+  }
+  S.px=Math.max(S.pr,Math.min(W-S.pr,S.px)); S.py=Math.max(S.pr,Math.min(H-S.pr,S.py));
+
+  /* 스폰 — 시간이 갈수록 촘촘해짐 */
+  const rate = 1.45 - Math.min(1.00, S.t*0.0083);
+  S.spawnT-=dt;
+  if(S.spawnT<=0){ S.spawnT=rate*(0.7+Math.random()*0.6); spawnEnemy();
+    if(S.t>75 && Math.random()<0.35) spawnEnemy(); }
+
+  /* 적: 등대로 직진 */
+  for(let i=S.enemies.length-1;i>=0;i--){
+    const e=S.enemies[i];
+    const ex=LH.x-e.x, ey=LH.y-e.y, el=Math.hypot(ex,ey)||1;
+    e.a=Math.atan2(ey,ex);
+    e.x+=ex/el*e.spd*dt; e.y+=ey/el*e.spd*dt;
+    if(el < LH.r+e.r){
+      S.hp-=8; S.leaks++; S.enemies.splice(i,1);
+      S.fx.push({x:LH.x,y:LH.y,r:LH.r,life:.35,max:.35,c:'#ff5a4a'});
+      if(S.hp<=0){ endRun(false); return; }
+    }
+  }
+
+  /* 자동 사격: 플레이어 기준 가장 가까운 적 */
+  S.fireT-=dt;
+  if(S.fireT<=0){
+    let best=null, bd=430*430;
+    for(const e of S.enemies){ const d=(e.x-S.px)**2+(e.y-S.py)**2; if(d<bd){bd=d;best=e;} }
+    if(best){
+      S.fireT=S.fireInterval;
+      const base=Math.atan2(best.y-S.py, best.x-S.px);
+      for(let k=0;k<S.shots;k++){
+        const off=(k-(S.shots-1)/2)*0.16;
+        S.bullets.push({x:S.px,y:S.py,a:base+off,spd:640,life:1.1,pierce:S.pierce});
+      }
+    }
+  }
+
+  /* 총알 */
+  for(let i=S.bullets.length-1;i>=0;i--){
+    const b=S.bullets[i];
+    b.x+=Math.cos(b.a)*b.spd*dt; b.y+=Math.sin(b.a)*b.spd*dt; b.life-=dt;
+    if(b.life<=0||b.x<-20||b.x>W+20||b.y<-20||b.y>H+20){ S.bullets.splice(i,1); continue; }
+    for(let j=S.enemies.length-1;j>=0;j--){
+      const e=S.enemies[j];
+      if((e.x-b.x)**2+(e.y-b.y)**2 < (e.r+4)**2){
+        e.hp-=S.dmg;
+        if(e.hp<=0) killEnemy(j);
+        if(b.pierce>0){ b.pierce--; } else { S.bullets.splice(i,1); }
+        break;
+      }
+    }
+  }
+
+  /* 등대 광선 */
+  if(S.beam>0){
+    S.beamAng+=1.25*dt;
+    const len=210+S.beam*38, half=0.20, dps=7*S.beam;
+    for(let j=S.enemies.length-1;j>=0;j--){
+      const e=S.enemies[j];
+      const d=Math.hypot(e.x-LH.x,e.y-LH.y);
+      if(d<len){
+        let da=Math.atan2(e.y-LH.y,e.x-LH.x)-S.beamAng;
+        da=Math.atan2(Math.sin(da),Math.cos(da));
+        if(Math.abs(da)<half){ e.hp-=dps*dt; if(e.hp<=0) killEnemy(j); }
+      }
+    }
+  }
+
+  /* 경험치 구슬 */
+  for(let i=S.orbs.length-1;i>=0;i--){
+    const o=S.orbs[i];
+    const d=Math.hypot(S.px-o.x,S.py-o.y);
+    if(d<S.magnet){ const p=Math.min(1,(1-d/S.magnet)*3.2+0.25); o.x+=(S.px-o.x)*p*dt*7; o.y+=(S.py-o.y)*p*dt*7; }
+    if(d<S.pr+7){
+      S.orbs.splice(i,1); S.xp++;
+      if(S.xp>=S.xpNeed){ S.xp=0; S.level++; S.xpNeed=Math.round(S.xpNeed*1.55+3); showLevelUp(); return; }
+    }
+  }
+
+  for(let i=S.fx.length-1;i>=0;i--){ S.fx[i].life-=dt; if(S.fx[i].life<=0) S.fx.splice(i,1); }
+}
+
+function killEnemy(j){
+  const e=S.enemies[j];
+  S.enemies.splice(j,1); S.kills++;
+  S.orbs.push({x:e.x,y:e.y});
+  S.fx.push({x:e.x,y:e.y,r:e.r+6,life:.22,max:.22,c:'#ffb055'});
+  if(S.blast>0){
+    const R=58+S.blast*22;
+    S.fx.push({x:e.x,y:e.y,r:R,life:.28,max:.28,c:'#7fd4ff'});
+    for(let k=S.enemies.length-1;k>=0;k--){
+      const o=S.enemies[k];
+      if((o.x-e.x)**2+(o.y-e.y)**2 < R*R){
+        o.hp-=S.blast;
+        if(o.hp<=0){ S.enemies.splice(k,1); S.kills++; S.orbs.push({x:o.x,y:o.y}); }
+      }
+    }
+  }
+}
+
+/* ---------- 그리기 ---------- */
+function draw(){
+  ctx.fillStyle='#07080c'; ctx.fillRect(0,0,W,H);
+
+  // 바닥 격자
+  ctx.strokeStyle='rgba(255,255,255,.030)'; ctx.lineWidth=1;
+  for(let x=0;x<=W;x+=62){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let y=0;y<=H;y+=62){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  // 등대 사거리 표시
+  ctx.strokeStyle='rgba(255,217,138,.10)'; ctx.beginPath();
+  ctx.arc(LH.x,LH.y,120,0,7); ctx.stroke();
+
+  // 등대 광선
+  if(S.beam>0){
+    const len=210+S.beam*38;
+    const g=ctx.createRadialGradient(LH.x,LH.y,10,LH.x,LH.y,len);
+    g.addColorStop(0,'rgba(255,232,170,.42)'); g.addColorStop(1,'rgba(255,232,170,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(LH.x,LH.y);
+    ctx.arc(LH.x,LH.y,len,S.beamAng-0.20,S.beamAng+0.20); ctx.closePath(); ctx.fill();
+  }
+
+  // 이펙트
+  for(const f of S.fx){
+    const k=f.life/f.max;
+    ctx.strokeStyle=f.c; ctx.globalAlpha=k*0.8; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(f.x,f.y,f.r*(1.7-k*0.7),0,7); ctx.stroke(); ctx.globalAlpha=1;
+  }
+
+  // 등대
+  const hpr=Math.max(0,S.hp/MAXHP);
+  const gl=ctx.createRadialGradient(LH.x,LH.y,4,LH.x,LH.y,86);
+  gl.addColorStop(0,'rgba(255,217,138,'+(0.30+hpr*0.30)+')'); gl.addColorStop(1,'rgba(255,217,138,0)');
+  ctx.fillStyle=gl; ctx.beginPath(); ctx.arc(LH.x,LH.y,86,0,7); ctx.fill();
+  ctx.fillStyle= hpr>0.35 ? '#ffd98a' : '#ff7a5a';
+  ctx.beginPath(); ctx.arc(LH.x,LH.y,LH.r,0,7); ctx.fill();
+  ctx.fillStyle='#07080c'; ctx.beginPath(); ctx.arc(LH.x,LH.y,LH.r*0.42,0,7); ctx.fill();
+
+  // 경험치 구슬
+  ctx.fillStyle='#6fe3ff';
+  for(const o of S.orbs){ ctx.beginPath(); ctx.arc(o.x,o.y,4,0,7); ctx.fill(); }
+
+  // 적
+  for(const e of S.enemies){
+    ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.a);
+    ctx.fillStyle= e.fast ? '#ff9d5c' : '#ff5a4a';
+    ctx.beginPath(); ctx.moveTo(e.r,0); ctx.lineTo(-e.r*0.8,e.r*0.78); ctx.lineTo(-e.r*0.8,-e.r*0.78);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+
+  // 총알
+  ctx.fillStyle='#fff3c4';
+  for(const b of S.bullets){ ctx.beginPath(); ctx.arc(b.x,b.y,3.4,0,7); ctx.fill(); }
+
+  // 플레이어
+  ctx.fillStyle='#ffffff'; ctx.beginPath(); ctx.arc(S.px,S.py,S.pr,0,7); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(S.px,S.py,S.magnet,0,7); ctx.stroke();
+
+  drawHUD();
+}
+
+function drawHUD(){
+  // 등대 내구도
+  ctx.fillStyle='rgba(255,255,255,.10)'; ctx.fillRect(30,34,W-60,12);
+  ctx.fillStyle= S.hp/MAXHP>0.35 ? '#ffd98a' : '#ff5a4a';
+  ctx.fillRect(30,34,(W-60)*Math.max(0,S.hp/MAXHP),12);
+  ctx.fillStyle='#9aa4b8'; ctx.font='600 14px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('등대 내구도',30,26);
+  ctx.textAlign='right'; ctx.fillText(Math.max(0,Math.round(S.hp))+' / '+MAXHP,W-30,26);
+
+  // 경험치
+  ctx.fillStyle='rgba(255,255,255,.10)'; ctx.fillRect(30,58,W-60,5);
+  ctx.fillStyle='#6fe3ff'; ctx.fillRect(30,58,(W-60)*(S.xp/S.xpNeed),5);
+
+  // 시간 / 웨이브 / 처치
+  const left=Math.max(0,RUN_TIME-S.t);
+  ctx.textAlign='center'; ctx.fillStyle='#e8ecf4'; ctx.font='800 30px sans-serif';
+  ctx.fillText(Math.ceil(left)+'', W/2, 104);
+  ctx.font='600 13px sans-serif'; ctx.fillStyle='#9aa4b8';
+  ctx.fillText('웨이브 '+(S.t<60?1:2)+'  ·  Lv '+S.level+'  ·  처치 '+S.kills, W/2, 126);
+}
+
+/* ---------- 개발용: 화면 없이 밸런스 시뮬 ---------- */
+window.__dev={
+  reset(){ S=newState(); running=false;
+    ovEnd.classList.remove('on'); ovLevel.classList.remove('on'); ovTitle.classList.remove('on'); },
+  step(dt){ update(dt); },
+  render(){ draw(); },
+  auto(){ // 레벨업이 뜨면 무작위 강화를 자동 선택
+    const box=document.getElementById('lvCards');
+    if(ovLevel.classList.contains('on')&&box.children.length){
+      box.children[Math.floor(Math.random()*box.children.length)].click();
+      running=false; // rAF는 시뮬에서 쓰지 않음
+    }
+  },
+  get s(){ return S; },
+  ended(){ return ovEnd.classList.contains('on'); }
+};
+})();
+</script>
+</body>
+</html>

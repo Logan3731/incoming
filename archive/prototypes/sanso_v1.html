@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>산소 — 시제품 v1</title>
+<style>
+  :root{
+    --ground:#0F0D0C; --line:#2A211C;
+    --bone:#DCEFF2; --text:#B9C6C9; --dim:#6F7A7C; --faint:#454E50;
+    --ember:#E4552B; --teal:#58C6CC;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;background:var(--ground);overflow:hidden;
+    font-family:var(--sans);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #stage{position:absolute;top:0;left:0;width:620px;height:1060px;transform-origin:top left}
+  canvas{position:absolute;top:0;left:0;width:620px;height:1060px;display:block;touch-action:none}
+  .overlay{position:absolute;top:0;left:0;width:620px;height:1060px;display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    background:var(--ground);color:var(--text);padding:52px 44px;text-align:center}
+  .overlay.on{display:flex}
+  h1{font-size:64px;letter-spacing:.34em;text-indent:.34em;font-weight:800;color:var(--bone);line-height:1}
+  .tag{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--ember);margin-top:18px}
+  .rule{width:104px;height:1px;background:var(--line);margin:28px 0}
+  .brief{text-align:left;max-width:404px;font-size:14px;line-height:1.9;color:var(--text)}
+  .brief b{color:var(--bone)}
+  .brief .row{display:flex;gap:14px;padding:9px 0;border-top:1px solid var(--line)}
+  .brief .row:last-child{border-bottom:1px solid var(--line)}
+  .brief .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--ember);flex:none;width:52px;padding-top:5px}
+  .lede{margin-bottom:22px;color:var(--dim);font-size:14px;line-height:1.9}
+  .lede b{color:var(--bone)}
+  h2{font-size:30px;font-weight:800;color:var(--bone);margin-bottom:6px}
+  .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--ember);margin-bottom:26px}
+  .stat{font-family:var(--mono);font-size:13px;color:var(--dim);line-height:2.1;margin-bottom:8px}
+  .stat b{color:var(--bone);font-size:17px}
+  .btn{border:none;background:transparent;color:var(--teal);font-family:inherit;
+    font-size:19px;font-weight:800;letter-spacing:.12em;padding:19px 52px;margin-top:38px;cursor:pointer;
+    background-image:linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal)),
+      linear-gradient(var(--teal),var(--teal)),linear-gradient(var(--teal),var(--teal));
+    background-repeat:no-repeat;
+    background-size:16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px,16px 2px,2px 16px;
+    background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom}
+  .btn small{font-family:var(--mono);font-size:11px;opacity:.5;font-weight:500}
+  .btn:active{background-color:rgba(88,198,204,.1)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv" width="620" height="1060"></canvas>
+
+  <div class="overlay on" id="ovTitle">
+    <h1>산소</h1>
+    <div class="tag">모두를 구할 수는 없을지도 모른다</div>
+    <div class="rule"></div>
+    <div class="brief">
+      <div class="lede">불난 집에 들어간다. <b>쓰러진 사람을 업고 나오면 된다.</b><br>
+        단순하다. 산소가 버텨주는 동안은.</div>
+      <div class="row"><span class="k">이동</span><span>가고 싶은 곳을 <b>끌거나 누르면</b> 그리로 간다 (방향키·WASD도 됨)</span></div>
+      <div class="row"><span class="k">업기</span><span>쓰러진 사람에게 <b>닿으면 업는다.</b> 업으면 느려진다. 한 명씩만</span></div>
+      <div class="row"><span class="k">출구</span><span>아래 <b>청록 구역</b>에 내려놓으면 구조. 그동안 산소도 다시 찬다</span></div>
+      <div class="row"><span class="k">산소</span><span>안에 있는 동안 계속 줄어든다. <b>0이 되면 당신이 쓰러진다</b></span></div>
+      <div class="row"><span class="k">불</span><span>계속 번진다. <b>달아오르는 칸이 미리 보인다.</b> 불이 닿은 사람은 끝이다</span></div>
+    </div>
+    <button class="btn" id="btnStart">진입 <small>ENTER</small></button>
+  </div>
+
+  <div class="overlay" id="ovEnd">
+    <h2 id="endTitle">철수</h2>
+    <div class="kicker" id="endKicker">결과</div>
+    <div class="stat" id="endStat"></div>
+    <button class="btn" id="btnAgain">한 번 더 <small>ENTER</small></button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const W=620,H=1060;
+const COLS=10, ROWS=13, CELL=56, BX=(W-COLS*CELL)/2, BY=190;
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const stage=document.getElementById('stage');
+const ovTitle=document.getElementById('ovTitle'), ovEnd=document.getElementById('ovEnd');
+
+function fit(){ const s=Math.min(innerWidth/W, innerHeight/H);
+  stage.style.transform='translate('+((innerWidth-W*s)/2)+'px,'+((innerHeight-H*s)/2)+'px) scale('+s+')'; }
+addEventListener('resize',fit); fit();
+
+const C={
+  ground:'#0F0D0C', floor:'#191413', wall:'#2E2620', line:'#241C17',
+  ember:'#E4552B', heat:'rgba(228,85,43,', bone:'#DCEFF2', teal:'#58C6CC',
+  tealSoft:'rgba(88,198,204,.14)', text:'#B9C6C9', dim:'#6F7A7C', faint:'#454E50'
+};
+const F_MONO='ui-monospace,SFMono-Regular,Menlo,monospace';
+const F_SANS='-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+const mono=(w,s)=>w+' '+s+'px '+F_MONO;
+const sans=(w,s)=>w+' '+s+'px '+F_SANS;
+
+/* ================= 판 ================= */
+/* #=벽  .=바닥  E=출구(산소 충전)  F=발화점 */
+const MAP=[
+'##########',
+'#...#...F#',
+'#...#....#',
+'#...#....#',
+'##.###.###',
+'#........#',
+'###.####.#',
+'#...#....#',
+'#...#....#',
+'##.###.###',
+'#........#',
+'#........#',
+'####EE####'];
+
+/* 쓰러진 사람들 — [칸x, 칸y, 이름] */
+const VICTIMS=[
+  [2,2,'ㄱ'],   // 왼쪽 위 방 — 멀지만 시간 여유
+  [5,2,'ㄴ'],   // 불난 방 문쪽 — 시간 있음
+  [8,3,'ㄷ'],   // 불난 방 안쪽 — 곧 위험
+  [1,8,'ㄹ'],   // 왼쪽 중간 방
+  [8,8,'ㅁ']    // 오른쪽 중간 방 — 중반에 위험해짐
+];
+
+/* ================= 수치 ================= */
+const SPD=165, CARRY_MULT=0.55;
+const O2MAX=100, O2_DRAIN=3.2, O2_CARRY=2.8, O2_FIRE=25, O2_FILL=35;
+const IGNITE=7.0;              // 이웃 불 1개 기준, 옮겨붙기까지 초
+
+/* ================= 상태 ================= */
+let S=null, last=0, running=false;
+
+const idx=(x,y)=>y*COLS+x;
+const inB=(x,y)=>x>=0&&x<COLS&&y>=0&&y<ROWS;
+const wall=(x,y)=>!inB(x,y)||MAP[y][x]==='#';
+const isExit=(x,y)=>inB(x,y)&&MAP[y][x]==='E';
+const cellOf=(px,py)=>({x:Math.floor((px-BX)/CELL), y:Math.floor((py-BY)/CELL)});
+const cx=x=>BX+x*CELL+CELL/2, cy=y=>BY+y*CELL+CELL/2;
+
+function newRun(){
+  const burn=new Array(COLS*ROWS).fill(false);
+  const heat=new Array(COLS*ROWS).fill(0);
+  let fx=8,fy=2;
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++) if(MAP[y][x]==='F'){fx=x;fy=y;}
+  burn[idx(fx,fy)]=true;
+  S={
+    px:cx(4.5-0.5)+CELL/2, py:cy(11), r:13,       // 출구 앞 로비에서 시작
+    tx:0, ty:0, dragging:false,
+    o2:O2MAX, t:0, burn, heat,
+    victims:VICTIMS.map(v=>({x:v[0],y:v[1],name:v[2],state:'down'})), // down|carried|saved|dead
+    carrying:null, saved:0, lost:0, log:[], msgT:0, end:false
+  };
+  S.tx=S.px; S.ty=S.py;
+}
+
+/* ================= 입력 ================= */
+function toLocal(e){ const r=cv.getBoundingClientRect(), sc=r.width/W;
+  return {x:(e.clientX-r.left)/sc, y:(e.clientY-r.top)/sc}; }
+cv.addEventListener('pointerdown',e=>{ if(!S||S.end)return; cv.setPointerCapture(e.pointerId);
+  const p=toLocal(e); S.tx=p.x; S.ty=p.y; S.dragging=true; });
+cv.addEventListener('pointermove',e=>{ if(!S||!S.dragging)return;
+  const p=toLocal(e); S.tx=p.x; S.ty=p.y; });
+cv.addEventListener('pointerup',()=>{ if(S)S.dragging=false; });
+cv.addEventListener('pointercancel',()=>{ if(S)S.dragging=false; });
+
+const KMAP={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right'};
+const keys={up:false,down:false,left:false,right:false};
+addEventListener('keydown',e=>{
+  const k=KMAP[e.code];
+  if(k){ keys[k]=true; e.preventDefault(); if(S)S.dragging=false; return; }
+  if(e.code==='Enter'||e.code==='Space'){
+    if(ovTitle.classList.contains('on')||ovEnd.classList.contains('on')){ e.preventDefault(); start(); }
+  }
+});
+addEventListener('keyup',e=>{ const k=KMAP[e.code]; if(k){ keys[k]=false; e.preventDefault(); } });
+addEventListener('blur',()=>{ for(const k in keys) keys[k]=false; });
+
+document.getElementById('btnStart').onclick=start;
+document.getElementById('btnAgain').onclick=start;
+function start(){
+  newRun(); ovTitle.classList.remove('on'); ovEnd.classList.remove('on');
+  running=true; last=performance.now(); requestAnimationFrame(loop);
+}
+
+/* ================= 진행 ================= */
+function say(t){ S.log.push(t); if(S.log.length>2)S.log.shift(); S.msgT=3.2; }
+
+function moveAxis(nx,ny){
+  // 원이 벽 칸에 겹치지 않는 위치만 허용
+  const r=S.r;
+  for(const [ox,oy] of [[-r,-r],[r,-r],[-r,r],[r,r],[0,-r],[0,r],[-r,0],[r,0]]){
+    const c=cellOf(nx+ox,ny+oy);
+    if(wall(c.x,c.y)) return false;
+  }
+  return true;
+}
+
+function update(dt){
+  if(S.end) return;
+  S.t+=dt;
+
+  /* 이동 — 키보드 우선, 없으면 드래그 목표 */
+  const kx=(keys.right?1:0)-(keys.left?1:0), ky=(keys.down?1:0)-(keys.up?1:0);
+  const spd=SPD*(S.carrying?CARRY_MULT:1);
+  let dx=0,dy=0;
+  if(kx||ky){ const l=Math.hypot(kx,ky); dx=kx/l*spd*dt; dy=ky/l*spd*dt; S.tx=S.px; S.ty=S.py; }
+  else { const vx=S.tx-S.px, vy=S.ty-S.py, l=Math.hypot(vx,vy);
+    if(l>4){ const st=Math.min(spd*dt,l); dx=vx/l*st; dy=vy/l*st; } }
+  if(dx&&moveAxis(S.px+dx,S.py)) S.px+=dx;
+  if(dy&&moveAxis(S.px,S.py+dy)) S.py+=dy;
+
+  /* 불 번짐 — 이웃 불 수만큼 달아오르고, 다 차면 붙는다 */
+  const add=new Array(COLS*ROWS).fill(0);
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    if(!S.burn[idx(x,y)]) continue;
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([ax,ay])=>{
+      const nx2=x+ax, ny2=y+ay;
+      if(inB(nx2,ny2)&&!wall(nx2,ny2)&&!S.burn[idx(nx2,ny2)]) add[idx(nx2,ny2)]+=dt/IGNITE;
+    });
+  }
+  for(let i=0;i<COLS*ROWS;i++){
+    if(add[i]){ S.heat[i]=Math.min(1.2,S.heat[i]+add[i]);
+      if(S.heat[i]>=1) S.burn[i]=true; }
+  }
+
+  /* 불이 닿은 사람 */
+  S.victims.forEach(v=>{
+    if(v.state==='down'&&S.burn[idx(v.x,v.y)]){
+      v.state='dead'; S.lost++; say(v.name+'을(를) 잃었다');
+    }
+  });
+
+  /* 업기 / 내려놓기 */
+  const pc=cellOf(S.px,S.py);
+  if(!S.carrying){
+    for(const v of S.victims){
+      if(v.state!=='down') continue;
+      if(Math.hypot(cx(v.x)-S.px, cy(v.y)-S.py)<CELL*0.55){
+        v.state='carried'; S.carrying=v; say(v.name+'을(를) 업었다'); break;
+      }
+    }
+  }
+  const atExit=isExit(pc.x,pc.y)||(pc.y>=11&&pc.x>=4&&pc.x<=5);
+  if(S.carrying&&atExit){
+    S.carrying.state='saved'; S.saved++; say(S.carrying.name+'을(를) 구했다'); S.carrying=null;
+  }
+
+  /* 산소 */
+  if(atExit) S.o2=Math.min(O2MAX,S.o2+O2_FILL*dt);
+  else{
+    S.o2-=(O2_DRAIN+(S.carrying?O2_CARRY:0))*dt;
+    if(S.burn[idx(pc.x,pc.y)]) S.o2-=O2_FIRE*dt;
+  }
+  if(S.msgT>0)S.msgT-=dt;
+
+  /* 끝 */
+  if(S.o2<=0){ S.o2=0; finish(false); return; }
+  const unresolved=S.victims.some(v=>v.state==='down'||v.state==='carried');
+  if(!unresolved&&atExit) finish(true);
+}
+
+function finish(alive){
+  S.end=true; running=false;
+  const name=alive?(S.lost===0?'전원 구조':'철수'):'대원 응답 없음';
+  document.getElementById('endTitle').textContent=name;
+  document.getElementById('endKicker').textContent=alive?'임무 종료':'산소 0';
+  document.getElementById('endStat').innerHTML=
+    '구조 <b>'+S.saved+'</b> / '+S.victims.length+
+    '   ·   잃음 <b>'+S.lost+'</b>'+
+    (alive?'':'   ·   미확인 <b>'+S.victims.filter(v=>v.state==='down'||v.state==='carried').length+'</b>')+
+    '<br>경과 <b>'+S.t.toFixed(1)+'초</b>';
+  ovEnd.classList.add('on');
+}
+
+/* ================= 그리기 ================= */
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(running) update(dt);
+  if(S) draw();
+  if(running||!S.end) requestAnimationFrame(loop);
+}
+
+function draw(){
+  ctx.fillStyle=C.ground; ctx.fillRect(0,0,W,H);
+
+  /* 판 */
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    const px=BX+x*CELL, py=BY+y*CELL, i=idx(x,y);
+    if(wall(x,y)){ ctx.fillStyle=C.wall; ctx.fillRect(px,py,CELL,CELL); continue; }
+    ctx.fillStyle=C.floor; ctx.fillRect(px,py,CELL,CELL);
+    if(isExit(x,y)||(y>=11&&x>=4&&x<=5)){
+      ctx.fillStyle=C.tealSoft; ctx.fillRect(px,py,CELL,CELL);
+    }
+    if(S.burn[i]){
+      ctx.fillStyle=C.ember; ctx.fillRect(px+2,py+2,CELL-4,CELL-4);
+      ctx.fillStyle='rgba(255,216,74,.5)';
+      const f=6+4*Math.sin(S.t*7+x*3+y*5);
+      ctx.fillRect(px+CELL/2-f/2, py+CELL/2-f/2, f, f);
+    } else if(S.heat[i]>0.12){
+      ctx.fillStyle=C.heat+(S.heat[i]*0.5)+')';   // 달아오르는 칸 — 미리 보인다
+      ctx.fillRect(px+2,py+2,CELL-4,CELL-4);
+    }
+  }
+  ctx.strokeStyle=C.line; ctx.lineWidth=1;
+  for(let x=0;x<=COLS;x++){ ctx.beginPath(); ctx.moveTo(BX+x*CELL,BY); ctx.lineTo(BX+x*CELL,BY+ROWS*CELL); ctx.stroke(); }
+  for(let y=0;y<=ROWS;y++){ ctx.beginPath(); ctx.moveTo(BX,BY+y*CELL); ctx.lineTo(BX+COLS*CELL,BY+y*CELL); ctx.stroke(); }
+
+  /* 사람들 */
+  S.victims.forEach(v=>{
+    if(v.state==='carried') return;
+    const X=cx(v.x), Y=cy(v.y);
+    if(v.state==='dead'){
+      ctx.strokeStyle=C.faint; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(X-7,Y-7); ctx.lineTo(X+7,Y+7);
+      ctx.moveTo(X+7,Y-7); ctx.lineTo(X-7,Y+7); ctx.stroke(); return;
+    }
+    if(v.state==='saved') return;
+    const danger=S.heat[idx(v.x,v.y)]>0.4;
+    const blink=danger&&Math.sin(S.t*10)>0;
+    ctx.fillStyle=blink?C.ember:C.bone;
+    ctx.beginPath(); ctx.ellipse(X,Y,11,7,0,0,7); ctx.fill();   // 누워 있는 사람
+    ctx.textAlign='center'; ctx.font=sans(800,11); ctx.fillStyle=C.ground;
+    ctx.fillText(v.name,X,Y+4);
+  });
+
+  /* 대원 */
+  ctx.fillStyle=C.bone;
+  ctx.beginPath(); ctx.arc(S.px,S.py,S.r,0,7); ctx.fill();
+  if(S.carrying){
+    ctx.fillStyle=C.teal;
+    ctx.beginPath(); ctx.ellipse(S.px,S.py-S.r-4,9,6,0,0,7); ctx.fill();
+    ctx.textAlign='center'; ctx.font=sans(800,10); ctx.fillStyle=C.ground;
+    ctx.fillText(S.carrying.name,S.px,S.py-S.r);
+  }
+
+  /* HUD */
+  ctx.textAlign='left'; ctx.font=sans(800,15); ctx.fillStyle=C.bone;
+  ctx.fillText('산소',46,44);
+  ctx.fillStyle='rgba(255,255,255,.08)'; ctx.fillRect(100,32,W-146,14);
+  const o=S.o2/O2MAX;
+  ctx.fillStyle= o>0.35?C.teal:C.ember;
+  ctx.fillRect(100,32,(W-146)*o,14);
+  ctx.textAlign='right'; ctx.font=mono(700,13); ctx.fillStyle= o>0.35?C.text:C.ember;
+  ctx.fillText(Math.ceil(S.o2),W-46,64);
+
+  ctx.textAlign='left'; ctx.font=mono(500,12); ctx.fillStyle=C.dim;
+  ctx.fillText('구조 '+S.saved+' / '+S.victims.length+'   잃음 '+S.lost,46,70);
+  ctx.textAlign='right';
+  ctx.fillText(S.t.toFixed(0)+'초',W-46,44);
+
+  /* 아래 안내 + 로그 */
+  ctx.textAlign='center'; ctx.font=sans(500,13);
+  if(S.msgT>0&&S.log.length){
+    ctx.fillStyle=C.text; ctx.fillText(S.log[S.log.length-1],W/2,BY+ROWS*CELL+40);
+  } else {
+    ctx.fillStyle=C.faint;
+    ctx.fillText(S.carrying?'출구까지 데려가세요':'쓰러진 사람에게 닿으면 업습니다',W/2,BY+ROWS*CELL+40);
+  }
+}
+
+/* ================= 개발용 ================= */
+window.__dev={
+  start, get s(){return S;},
+  step(dt){ update(dt); },
+  tp(x,y){ S.px=cx(x); S.py=cy(y); S.tx=S.px; S.ty=S.py; },
+  target(x,y){ S.tx=cx(x); S.ty=cy(y); S.dragging=true; },
+  wall, isExit, render(){ draw(); },
+  ended(){ return ovEnd.classList.contains('on'); }
+};
+})();
+</script>
+</body>
+</html>
