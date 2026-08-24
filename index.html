@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>수신 중</title>
+<title>수신 중 — 밤 1</title>
 <style>
   :root{
     --ground:#0E0D0C; --panel:#151312; --line:#2A2520;
@@ -95,6 +95,17 @@
   .opt:disabled{opacity:.35;cursor:default}
 
   .overlay{position:absolute;inset:0;background:var(--ground);display:none;flex-direction:column;padding:60px 44px;overflow-y:auto}
+  #ovMain{justify-content:center;padding-bottom:120px}
+  .pulse{width:9px;height:9px;border-radius:50%;background:var(--ember);display:inline-block;margin-right:9px;vertical-align:2px;animation:blink 2.2s steps(1) infinite}
+  .mainrule{width:120px;height:1px;background:var(--line);margin:34px auto}
+  .premise{font-size:15px;line-height:1.95;color:var(--dim);text-align:center;max-width:400px;margin:0 auto}
+  .premise b{color:var(--text)}
+  .mainfoot{position:absolute;left:0;right:0;bottom:40px;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--faint)}
+  .pro{margin:44px auto 0;max-width:440px;font-size:16px;line-height:2.05;min-height:420px}
+  .pro p{margin-bottom:18px;color:var(--text)}
+  .pro p b{color:var(--bone)}
+  .pro p.time{font-family:var(--mono);color:var(--ember);letter-spacing:.1em;margin-top:34px}
+  .skiphint{position:absolute;left:0;right:0;bottom:26px;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--faint)}
   .overlay.on{display:flex}
   h1{font-size:56px;letter-spacing:.3em;text-indent:.3em;font-weight:800;color:var(--bone);line-height:1;text-align:center}
   .tag{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--ember);text-align:center;margin-top:16px}
@@ -176,17 +187,21 @@
     <div class="opts" id="opts"></div>
   </footer>
 
-  <div class="overlay on" id="ovIntro">
+  <div class="overlay on" id="ovMain">
     <h1>수신 중</h1>
-    <div class="tag">밤 1</div>
-    <div class="brief">
-      <p>남천시 119종합상황실. 야간조.<br>
-      오늘부터 <b>혼자 받는다.</b> 옆자리의 <b>윤 주임</b>은 첫 건만 봐주겠다고 했다. 그 말을 하는 데 네 단어를 썼다.</p>
-      <p><b>질문 하나에 시간이 간다.</b> 두 번째 라인이 깜빡이면, 그게 무엇이든 기다리고 있는 것이다.</p>
-      <p>펌프 1팀은 차고에 있다. 차수호, 마도수, 그리고 오늘이 첫 야간인 임볕.</p>
-      <p class="cue">22시 14분. 벨.</p>
-    </div>
-    <button class="btn" id="btnStart">받는다</button>
+    <div class="tag"><span class="pulse"></span>119 상황실의 밤</div>
+    <div class="mainrule"></div>
+    <div class="premise">전화는 목소리뿐이다.<br><b>보낼 것인가.</b><br>펌프차는 한 대뿐이다.</div>
+    <button class="btn" id="btnMain">근무 시작</button>
+    <div class="mainfoot">이어폰을 끼면 좋습니다 · logan · 2026</div>
+  </div>
+
+  <div class="overlay" id="ovIntro">
+    <h2 style="text-align:center">밤 1</h2>
+    <div class="tag">프롤로그</div>
+    <div class="pro" id="proBody"></div>
+    <button class="btn" id="btnStart" style="visibility:hidden">받는다</button>
+    <div class="skiphint" id="skipHint">화면을 누르면 빨리 감기</div>
   </div>
 
   <div class="overlay" id="ovBoard">
@@ -1010,21 +1025,64 @@ async function night1(){
   report1();
 }
 function reset(){ location.reload(); }
-$('#btnStart').onclick=()=>{ audioInit(); $('#ovIntro').classList.remove('on'); drawTeams(); night1(); };
+let proSkip=false;
+function typeInto(el, html){
+  if(S.fast||proSkip){ el.innerHTML=html; return Promise.resolve(); }
+  return new Promise(res=>{
+    const parts=html.split(/(<[^>]+>)/); let i=0,j=0,out='';
+    (function step(){
+      if(proSkip){ el.innerHTML=html; res(); return; }
+      if(i>=parts.length){ res(); return; }
+      const p=parts[i];
+      if(p.startsWith('<')){ out+=p; el.innerHTML=out; i++; step(); return; }
+      if(j<p.length){ out+=p[j]; j++; el.innerHTML=out; if(p[j-1]!==' ') sfx.key();
+        setTimeout(step, p[j-1]==='…'?220:/[.?!,]/.test(p[j-1])?150:34); }
+      else { i++; j=0; step(); }
+    })();
+  });
+}
+async function prologue(){
+  const box=$('#proBody');
+  const lines=[
+    '남천시 119종합상황실. 야간조.',
+    '오늘부터 <b>혼자 받는다.</b>',
+    '옆자리의 윤 주임은 첫 건만 봐주겠다고 했다. 그 말을 하는 데 네 단어를 썼다.',
+    '<b>질문 하나에 시간이 간다.</b> 두 번째 라인이 깜빡이면, 그게 무엇이든 기다리고 있는 것이다.',
+    '펌프 1팀은 차고에 있다. 차수호, 마도수, 그리고 오늘이 첫 야간인 임볕.',
+  ];
+  for(const t of lines){
+    const el=document.createElement('p'); box.appendChild(el);
+    await typeInto(el, t); if(!proSkip) sfx.bell();
+    await wait(proSkip?0:420);
+  }
+  const tm=document.createElement('p'); tm.className='time'; box.appendChild(tm);
+  await typeInto(tm, '22:14:05'); await wait(proSkip?0:500);
+  sfx.ring();
+  const b=$('#btnStart'); b.style.visibility='visible'; $('#skipHint').style.display='none';
+}
+$('#btnMain').onclick=()=>{ audioInit(); $('#ovMain').classList.remove('on'); $('#ovIntro').classList.add('on'); prologue(); };
+$('#ovIntro').addEventListener('pointerdown',()=>{ proSkip=true; });
+$('#btnStart').onclick=()=>{ $('#ovIntro').classList.remove('on'); drawTeams(); night1(); };
 $('#btnNext').onclick=()=>{ board2(); };
 $('#btnBoard').onclick=()=>{ night2(); };
 $('#btnAgain').onclick=reset;
-addEventListener('keydown',e=>{ if(e.code==='Enter'&&$('#ovIntro').classList.contains('on')) $('#btnStart').click(); });
+addEventListener('keydown',e=>{
+  if(e.code!=='Enter') return;
+  if($('#ovMain').classList.contains('on')) $('#btnMain').click();
+  else if($('#ovIntro').classList.contains('on')&&$('#btnStart').style.visibility!=='hidden') $('#btnStart').click();
+});
 drawTeams();
 
 addEventListener('unhandledrejection',e=>{ window.__err=String((e.reason&&e.reason.stack)||e.reason); });
 addEventListener('error',e=>{ window.__err=String(e.message+' @'+e.lineno); });
 window.__dev={S,L, click(i){ const b=document.querySelectorAll('#opts .opt')[i]; if(b&&!b.disabled){ b.click(); return true;} return false; },
   labels(){ return [...document.querySelectorAll('#opts .opt')].map(b=>(b.disabled?'[x] ':'')+b.textContent.trim()); },
-  start(){ S.fast=true; $('#btnStart').click(); }, report:()=>$('#repBody').innerText, text:()=>pane.innerText,
+  start(){ S.fast=true; $('#btnMain').click();
+    const iv=setInterval(()=>{ const b=$('#btnStart'); if($('#ovIntro').classList.contains('on')&&b.style.visibility!=='hidden'){ b.click(); clearInterval(iv); } },30); }, report:()=>$('#repBody').innerText, text:()=>pane.innerText,
   next(){ $('#btnNext').click(); }, board(){ $('#btnBoard').click(); } };
 })();
 </script>
 </body>
 </html>
+
 
