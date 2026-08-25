@@ -230,7 +230,7 @@ function fit(){ const s=Math.min(innerWidth/620, innerHeight/1060);
 addEventListener('resize',fit); fit();
 
 /* ================= 상태 · 장부 ================= */
-const S={ t:0, fast:false, night:1,
+const S={ t:22*3600, fast:false, night:1,
   teams:{ pump:{name:'1팀', crew:'차수호·마도수·임볕', busy:0}, rescue:{name:'구조대', crew:'한이레·도강', busy:0}, amb:{name:'구급', crew:'', busy:0} },
   l2wait:null, radio:[], rec:[], cur:null, pov:null, phase:'intro', tools:{callback:false} };
 /* 밤을 넘어 기억되는 것 */
@@ -241,9 +241,9 @@ const L={ c2:null, c3:null, c4:{tier:null, team:null, guided:false, held:false, 
 const pad=n=>String(n).padStart(2,'0');
 const clockStr=t=>pad(Math.floor(t/3600)%24)+':'+pad(Math.floor(t/60)%60)+':'+pad(t%60);
 const hms=(h,m,s)=>h*3600+m*60+(s||0);
-function tick(sec){ S.t+=sec; $('#clock').textContent=clockStr(S.t);
+function tick(sec){ if(!(sec>0)) sec=0; S.t+=sec; $('#clock').textContent=clockStr(S.t);
   Object.values(S.teams).forEach(tm=>{ if(tm.busy>0) tm.busy=Math.max(0,tm.busy-sec); }); drawTeams(); }
-function jumpTo(h,m,s){ const target=hms(h,m,s||0); let d=target-S.t; if(d<0)d+=86400; tick(d); }
+function jumpTo(h,m,s){ const target=hms(h,m,s||0); let d=((target-S.t)%86400+86400)%86400; if(d>43200) d=0; tick(d); }
 function drawTeams(){
   $('#teams').innerHTML=Object.values(S.teams).map(tm=>
     '<span class="team '+(tm.busy>0?'out':'ok')+'">'+tm.name+(tm.busy>0?' 출동중 '+Math.ceil(tm.busy/60)+'분':' 대기')+'</span>').join('');
@@ -467,6 +467,90 @@ async function call1(){
   await yun('첫 건 끝났어. 다음부턴 내가 안 봐.');
   tick(9*60);
   radio('차수호','완진. 잔화 정리 후 복귀.');
+  await wait(500);
+  radio('임볕','…첫 출동이었습니다.');
+  radio('차수호','무전에 감상 넣지 마라.');
+}
+
+/* ── 22:31 잘못 걸린 전화 ── */
+async function call1b(){
+  jumpTo(22,48,20);
+  beginCall({id:'c1b', title:'잘못 걸린 전화', num:'010-****-8867', truth:'오발신 (배달 항의)'});
+  setLine('l1','live'); sfx.ring();
+  sys('22:48:20 · L1 수신 — 발신 010-****-8867');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','황금반점이죠? 아니 짬뽕 하나 시킨 지가 두 시간인데 (TV 소리) 아직도 안 와요?');
+  const r=await menu([
+    {id:'fix',k:'정정',t:'"여기는 119입니다."',act:true},
+    {id:'ask',k:'질문',t:'"…비상 상황이십니까?"',act:true},
+  ],'22:48');
+  if(r==='ask'){ me('…비상 상황이십니까?'); tick(8);
+    await type('caller','신고자','비상이죠! 배가 고픈— (잠깐 멈춤) …119? 여기 119예요? 아이고, 죄송합니다!! (뚝)'); }
+  else { me('여기는 119입니다. 화재·구조·구급 신고 전화입니다.'); tick(6);
+    await type('caller','신고자','…119? (한참) 아이고. 버튼을 잘못… 죄송합니다. (뚝)'); }
+  sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+  await yun('하루 스무 통은 와. 익숙해져.');
+  endCall({judge:'오발신 안내', result:'정상'});
+}
+
+/* ── 00:58 승강기 + L2 무언 전화 ── */
+async function callElev(){
+  jumpTo(0,58,15);
+  beginCall({id:'c5b', title:'승강기 갇힘', num:'010-****-6634', truth:'승강기 갇힘 (2명, 영아 동반)'});
+  setLine('l1','live'); sfx.ring();
+  sys('00:58:15 · L1 수신 — 발신 010-****-6634');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','신고자','(웅웅 울리는 소리) 저기… 엘리베이터에 갇혔어요. 은행나무아파트 2동이요. 8층쯤에서 멈췄어요.');
+  let l2on=false;
+  const startL2=()=>{ if(!l2on){ l2on=true; S.l2wait=S.t; setLine('l2','wait'); sys('L2 수신 대기 — 발신 070-****-9917'); } };
+  const qs=[
+    {id:'who', t:'몇 분이 타고 계십니까?', me:'안에 몇 분이 계십니까?', a:()=>'저랑… 애기랑요. 둘이요. (아기 칭얼거리는 소리)'},
+    {id:'air', t:'숨쉬기는 괜찮으십니까?', me:'숨쉬기는 괜찮으세요? 안이 덥습니까?', a:()=>'덥긴 한데… 애가 좀 처지는 것 같아요. 자는 건지…'},
+    {id:'btn', t:'비상호출은 눌러 보셨습니까?', me:'조작반의 비상호출 버튼을 눌러 보셨습니까?', a:()=>'눌렀는데 아무도 안 받아요. 관리실도요.'},
+  ];
+  const r=await converse('신고자', qs,
+    a=>[
+      {id:'co', k:'통보', t:'비긴급 — 승강기 유지관리업체 통보', act:true},
+      {id:'res', k:'출동', t:'잠재긴급 — 구조대 출동', act:true, disabled:S.teams.rescue.busy>0},
+    ], a=>'매뉴얼 4 — 갇힘은 어느 단계인가',
+    async a=>{ if(a.length>=1) startL2(); });
+  startL2();
+  L.elev={act:r.act, air:r.asked.includes('air')};
+  if(r.act==='res'){
+    sfx.stamp(); me('구조대, 은행나무아파트 2동 승강기 갇힘. 2명, 영아 동반. 출동. 사륙?');
+    S.teams.rescue.busy=25*60; tick(8);
+    radio('한이레','사칠. 구조대 출동.');
+    me('구조대 출동시켰습니다. 아기 얼굴에 바람 부쳐 주시면서 기다리세요. 끊으셔도 됩니다. 무슨 일 있으면 바로 다시 119.');
+  } else {
+    me('승강기 유지관리업체에 통보하겠습니다. 보통 20분 안에 도착합니다. 상태가 나빠지면 즉시 다시 119 눌러 주세요.'); tick(10);
+    await type('caller','신고자','20분이요…? (아기 소리) …네. 알겠어요.');
+  }
+  sfx.hangup(); sys('L1 통화 종료'); setLine('l1','');
+  endCall({judge:r.act==='res'?'구조대 출동':'업체 통보', result:'—'});
+  drawTeams();
+  /* L2 — 무언 전화 */
+  const waited=Math.max(0,Math.round(S.t-S.l2wait));
+  beginCall({id:'c5c', line:'L2', title:'무언 전화', num:'070-****-9917', truth:'?'});
+  setLine('l2','live'); sfx.ring();
+  sys(clockStr(S.t)+' · L2 연결 — 대기 '+waited+'초');
+  me('남천 119입니다. 무엇을 도와드릴까요?');
+  await type('caller','—','(숨소리) (숨소리) (아주 멀리서, 물소리 같은 것)');
+  me('말씀하실 수 있으면 말씀하세요. 어려우시면 숫자 버튼을 아무거나 눌러 주세요.');
+  tick(14);
+  await type('caller','—','(뚝)');
+  sfx.hangup(); sys('L2 통화 종료 — 상대방 끊음'); setLine('l2','');
+  const r2=await menu([
+    {id:'log', k:'기록', t:'기록만', act:true},
+    {id:'police', k:'공동', t:'경찰 공동대응 — 위치 추적 요청', act:true},
+  ],'무응답 · 재발신 수단 없음');
+  if(r2==='police'){ me('무응답 신고. 경찰 공동대응, 위치 추적 요청.'); tick(12);
+    radio('상황실','경찰: 070 인터넷 전화 — 위치 특정 불가. 종결.'); }
+  else { me('기록. 070 발신, 무응답, 26초.'); tick(6); }
+  await yun('무응답. …내일부터 콜백 달린다더라. 오늘은 못 걸어.');
+  L.silent=r2;
+  endCall({judge:r2==='police'?'경찰 공동대응':'기록만', result:'미상'});
+  if(r.act==='co'){ tick(19*60); radio('상황실','승강기 업체: 은행나무아파트 2동 구출 완료. 2명 이상 없음.'); }
+  else { tick(9*60); radio('한이레','구조대 현장 도착. 승강기 수동 개방. 2명 구출, 이상 없음. 복귀합니다.'); }
 }
 
 async function call2(){
@@ -544,6 +628,8 @@ async function call3(){
     radio('차수호','사칠. 1팀 출동, 남천중 방면.');
     await wait(500);
     await yun('학교야. 보고 대상이다. 최초보고 양식 띄워.');
+    await menu([{id:'r', k:'보고', t:'최초보고 작성 — 남천중학교', act:true}],'중요화재 보고 대상');
+    sfx.stamp(); sys('최초보고 송신 — 학교 화재(신고), 1팀 출동');
   } else if(r.act==='amb'){
     sfx.stamp(); me('구급 1, 남천중 체육관. 현장 확인 출동. 사륙?');
     S.teams.amb.busy=25*60; tick(8);
@@ -751,6 +837,7 @@ async function finishScene(team, tier){
     await yun(t<=1?'다음.':(L.c4.held?'냄새가 난댔지. 비긴급으로 분류한 건 너야. 녹취 들을 거야.':'…다음.'));
     if(L.c4.held) L.trust-=2;
   }
+  if(!L.c4.held){ await wait(500); sys('(윤 주임이 말없이 종이컵을 내려놓고 간다. 김이 난다.)'); }
   S.rec.push({night:S.night, id:'s4', title:'현장 — '+unit+' 301호', time:clockStr(S.t).slice(0,5), num:'무전', lines:[], truth:'', judge:'', result:['경상','중상','위중','심정지→소생'][t]});
 }
 
@@ -801,6 +888,7 @@ async function call6(){
   beginCall({id:'c6', title:'"40분 뒤 세탁소" 발신 제한', num:'발신번호 표시제한', truth:'?'});
   setLine('l1','live'); sfx.ring();
   sys('03:12:00 · L1 수신 — 발신번호 표시제한');
+  sys('(03시. 상황실은 형광등 소리뿐이었다. 방금까지는.)');
   sys('(윤 주임이 시계를 본다)'); L.yunSawClock=true;
   me('남천 119입니다. 무엇을 도와드릴까요?');
   await type('caller','신고자','남천동 세탁소. 남천시장 입구 쪽, 파란 간판. 40분 뒤에 불이 납니다. (완전한 정적) 사람은 없을 겁니다.');
@@ -1019,7 +1107,7 @@ async function afterN2c1(){
 /* ================= 흐름 ================= */
 async function night1(){
   S.night=1; S.phase='n1';
-  await call1(); await call2(); await call3(); await call4(); await call5(); await call6(); await call7();
+  await call1(); await call2(); await call1b(); await call3(); await call4(); await call5(); await callElev(); await call6(); await call7();
   await wait(600);
   await menu([{id:'rep',k:'기록',t:'근무 기록 보기',act:true}],'06:00 · 교대');
   report1();
@@ -1084,5 +1172,6 @@ window.__dev={S,L, click(i){ const b=document.querySelectorAll('#opts .opt')[i];
 </script>
 </body>
 </html>
+
 
 
