@@ -361,7 +361,14 @@ async function converse(who, qs, acts, hintFn, onAsked){
   }
 }
 function card(left,right,cls){ const d=document.createElement('div'); d.className='card'+(cls?' '+cls:''); d.innerHTML='<span><b>'+left+'</b></span><span>'+right+'</span>'; pane.appendChild(d); }
-function beginCall(meta){
+async function nextGate(label){
+  if(S.fast) return;
+  if(pane.childElementCount===0) return;
+  await menu([{id:'n', k:'─', t:label||'다음으로', act:true}], '');
+}
+async function beginCall(meta){
+  await nextGate();
+  if(meta.t) jumpTo(meta.t[0],meta.t[1],meta.t[2]);
   S.cur={night:S.night, id:meta.id, title:meta.title, time:clockStr(S.t).slice(0,5), num:meta.num, lines:[], truth:meta.truth};
   pane.innerHTML=''; card((meta.line||'L1')+' · '+clockStr(S.t), meta.num); scrollDown();
 }
@@ -431,8 +438,7 @@ function flashView(){ const v=$('#view'); v.classList.remove('flash'); void v.of
 
 /* ================= 밤 1 ================= */
 async function call1(){
-  jumpTo(22,14,5);
-  beginCall({id:'c1', title:'성당 뒤 주택 화재', num:'010-****-4410', truth:'화재 (주택 지붕)'});
+    await beginCall({t:[22,14,5], id:'c1', title:'성당 뒤 주택 화재', num:'010-****-4410', truth:'화재 (주택 지붕)'});
   setLine('l1','live'); sfx.ring();
   sys('22:14:05 · L1 수신 — 발신 010-****-4410');
   me('남천 119입니다. 무엇을 도와드릴까요?');
@@ -474,8 +480,7 @@ async function call1(){
 
 /* ── 22:31 잘못 걸린 전화 ── */
 async function call1b(){
-  jumpTo(22,48,20);
-  beginCall({id:'c1b', title:'잘못 걸린 전화', num:'010-****-8867', truth:'오발신 (배달 항의)'});
+    await beginCall({t:[22,48,20], id:'c1b', title:'잘못 걸린 전화', num:'010-****-8867', truth:'오발신 (배달 항의)'});
   setLine('l1','live'); sfx.ring();
   sys('22:48:20 · L1 수신 — 발신 010-****-8867');
   me('남천 119입니다. 무엇을 도와드릴까요?');
@@ -495,8 +500,7 @@ async function call1b(){
 
 /* ── 00:58 승강기 + L2 무언 전화 ── */
 async function callElev(){
-  jumpTo(0,58,15);
-  beginCall({id:'c5b', title:'승강기 갇힘', num:'010-****-6634', truth:'승강기 갇힘 (2명, 영아 동반)'});
+    await beginCall({t:[0,58,15], id:'c5b', title:'승강기 갇힘', num:'010-****-6634', truth:'승강기 갇힘 (2명, 영아 동반)'});
   setLine('l1','live'); sfx.ring();
   sys('00:58:15 · L1 수신 — 발신 010-****-6634');
   me('남천 119입니다. 무엇을 도와드릴까요?');
@@ -530,7 +534,7 @@ async function callElev(){
   drawTeams();
   /* L2 — 무언 전화 */
   const waited=Math.max(0,Math.round(S.t-S.l2wait));
-  beginCall({id:'c5c', line:'L2', title:'무언 전화', num:'070-****-9917', truth:'?'});
+  await beginCall({id:'c5c', line:'L2', title:'무언 전화', num:'070-****-9917', truth:'?'});
   setLine('l2','live'); sfx.ring();
   sys(clockStr(S.t)+' · L2 연결 — 대기 '+waited+'초');
   me('남천 119입니다. 무엇을 도와드릴까요?');
@@ -554,8 +558,7 @@ async function callElev(){
 }
 
 async function call2(){
-  jumpTo(22,40,30);
-  beginCall({id:'c2', title:'"불났어" 주취자', num:'010-****-2201', truth:'비긴급 (고기 굽는 연기)'});
+    await beginCall({t:[22,40,30], id:'c2', title:'"불났어" 주취자', num:'010-****-2201', truth:'비긴급 (고기 굽는 연기)'});
   setLine('l1','live'); sfx.ring();
   sys('22:40:30 · L1 수신 — 발신 010-****-2201');
   me('남천 119입니다. 무엇을 도와드릴까요?');
@@ -594,8 +597,8 @@ async function call2(){
 }
 
 async function call3(){
-  jumpTo(23,5,10); S.l2wait=null;
-  beginCall({id:'c3', title:'남천중 체육관 화재 신고', num:'010-****-3317', truth:'허위 (중학생 3명, 연습한 장난)'});
+  S.l2wait=null;
+  await beginCall({t:[23,5,10], id:'c3', title:'남천중 체육관 화재 신고', num:'010-****-3317', truth:'허위 (중학생 3명, 연습한 장난)'});
   setLine('l1','live'); sfx.ring();
   sys('23:05:10 · L1 수신 — 발신 010-****-3317');
   me('남천 119입니다. 무엇을 도와드릴까요?');
@@ -646,7 +649,7 @@ function leak(n){ if(n===2) return ' (말끝에 작게 기침)'; if(n>=3) return
 async function call4(){
   S.phase='c4';
   L.c4.waited = S.l2wait ? (S.t-S.l2wait) : 0;
-  beginCall({id:'c4', line:'L2', title:'현대아파트 301호', num:'010-****-0082', truth:'화재 (주방 발화, 연기 흡입)'});
+  await beginCall({id:'c4', line:'L2', title:'현대아파트 301호', num:'010-****-0082', truth:'화재 (주방 발화, 연기 흡입)'});
   setLine('l2','live'); sfx.ring();
   sys(clockStr(S.t)+' · L2 연결 — 대기 '+Math.round(L.c4.waited)+'초');
   me('남천 119입니다. 무엇을 도와드릴까요?');
@@ -700,7 +703,7 @@ async function call4(){
     sfx.hangup(); sys('L2 통화 종료 — 비긴급'); setLine('l2','');
     endCall({judge:'비긴급 분류', result:'오분류'});
     await wait(900); tick(11*60);
-    beginCall({id:'c4b', title:'현대아파트 3동 — 이웃 신고', num:'010-****-5561', truth:'화재'});
+    await beginCall({id:'c4b', title:'현대아파트 3동 — 이웃 신고', num:'010-****-5561', truth:'화재'});
     setLine('l1','live'); sfx.ring();
     sys(clockStr(S.t)+' · L1 수신 — 발신 010-****-5561');
     me('남천 119입니다.');
@@ -743,7 +746,7 @@ async function scene4(team){
   const who = team==='pump' ? '임볕 · 1팀' : team==='rescue' ? '한이레 · 구조대' : '구급 1';
   const name = team==='pump' ? '임볕' : team==='rescue' ? '한이레' : '구급대원';
   await wait(900);
-  pane.innerHTML=''; card('시점 전환 — '+who, '현대아파트 3동', 'scene'); setPov(who); setView('arrive',{o2:30});
+  await nextGate('현장으로'); pane.innerHTML=''; card('시점 전환 — '+who, '현대아파트 3동', 'scene'); setPov(who); setView('arrive',{o2:30});
   const eta = team==='pump'?6 : team==='rescue'?9 : 8;
   tick(eta*60-60);
   sys(clockStr(S.t)+' · '+(team==='pump'?'펌프차':team==='rescue'?'구조공작차':'구급차')+' — 현대아파트 3동 앞');
@@ -824,7 +827,7 @@ async function finishScene(team, tier){
   radio(who, unit+' — '+lines[t]);
   tick(30);
   await wait(700);
-  pane.innerHTML=''; card('상황실 복귀', clockStr(S.t)); setPov(null);
+  await nextGate('상황실로'); pane.innerHTML=''; card('상황실 복귀', clockStr(S.t)); setPov(null);
   line('radio',null,'<span class="who">'+clockStr(S.t).slice(0,5)+' · '+who+'</span>'+unit+' — '+lines[t]);
   if(L.scene.burn) radio('차수호','1팀 임볕, 안면 1도 화상. 구급 인계 후 복귀.');
   if(L.c3==='pump'){
@@ -842,8 +845,7 @@ async function finishScene(team, tier){
 }
 
 async function call5(){
-  jumpTo(0,30,40);
-  beginCall({id:'c5', title:'"옆집에서 탄내" 박만수', num:'010-****-7749', truth:'비긴급 (이번 달 6번째 신고)'});
+    await beginCall({t:[0,30,40], id:'c5', title:'"옆집에서 탄내" 박만수', num:'010-****-7749', truth:'비긴급 (이번 달 6번째 신고)'});
   setLine('l1','live'); sfx.ring();
   sys('00:30:40 · L1 수신 — 발신 010-****-7749');
   await yun('또 그 번호네. 매주 전화해. 이번 달 여섯 번째야. 끊어.');
@@ -884,8 +886,7 @@ async function call5(){
 }
 
 async function call6(){
-  jumpTo(3,12,0);
-  beginCall({id:'c6', title:'"40분 뒤 세탁소" 발신 제한', num:'발신번호 표시제한', truth:'?'});
+    await beginCall({t:[3,12,0], id:'c6', title:'"40분 뒤 세탁소" 발신 제한', num:'발신번호 표시제한', truth:'?'});
   setLine('l1','live'); sfx.ring();
   sys('03:12:00 · L1 수신 — 발신번호 표시제한');
   sys('(03시. 상황실은 형광등 소리뿐이었다. 방금까지는.)');
@@ -920,8 +921,7 @@ async function call6(){
 }
 
 async function call7(){
-  jumpTo(3,52,30);
-  beginCall({id:'c7', title:'남천시장 세탁소 화재', num:'010-****-9023', truth:'화재 (콘센트 발화)'});
+    await beginCall({t:[3,52,30], id:'c7', title:'남천시장 세탁소 화재', num:'010-****-9023', truth:'화재 (콘센트 발화)'});
   setLine('l1','live'); sfx.ring();
   sys('03:52:30 · L1 수신 — 발신 010-****-9023');
   me('남천 119입니다.');
@@ -1010,8 +1010,7 @@ async function night2(){
   Object.values(S.teams).forEach(tm=>tm.busy=0); drawTeams();
   S.t=hms(22,0,0); $('#clock').textContent=clockStr(S.t);
   // 2-1 딸의 전화
-  jumpTo(0,10,20);
-  beginCall({id:'n2c1', title:'301호 할머니의 딸', num:'02-****-1180', truth:'문의'});
+    await beginCall({t:[0,10,20], id:'n2c1', title:'301호 할머니의 딸', num:'02-****-1180', truth:'문의'});
   sys('밤 2 · 근무 시작. 윤 주임은 옆자리에 있다. 모니터만 본다.');
   setLine('l1','live'); sfx.ring();
   sys('00:10:20 · L1 수신 — 발신 02-****-1180 (서울)');
@@ -1049,8 +1048,7 @@ async function night2(){
 }
 async function afterN2c1(){
   // 2-2 무응답 → 콜백
-  jumpTo(1,48,5);
-  beginCall({id:'n2c2', title:'무응답 신고', num:'010-****-4402', truth:'주머니 오발신'});
+    await beginCall({t:[1,48,5], id:'n2c2', title:'무응답 신고', num:'010-****-4402', truth:'주머니 오발신'});
   setLine('l1','live'); sfx.ring();
   sys('01:48:05 · L1 수신 — 발신 010-****-4402');
   me('남천 119입니다. 무엇을 도와드릴까요?');
@@ -1074,8 +1072,7 @@ async function afterN2c1(){
   else { me('기록.'); tick(5); await yun('콜백. 오늘부터 되잖아.'); L.trust--; }
   endCall({judge:{cb:'콜백',police:'경찰 공동대응',log:'기록만'}[r], result:r==='log'?'규정 미이행':'정상'});
   // 2-3 박만수
-  jumpTo(2,31,10);
-  beginCall({id:'n2c3', title:'박만수', num:'010-****-7749', truth:'?'});
+    await beginCall({t:[2,31,10], id:'n2c3', title:'박만수', num:'010-****-7749', truth:'?'});
   setLine('l1','live'); sfx.ring();
   sys('02:31:10 · L1 수신 — 발신 010-****-7749');
   await yun('또.');
