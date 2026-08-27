@@ -168,8 +168,8 @@
       <ol class="manual" id="manualList">
         <li><span class="n">1.</span> 첫 응답: <b>"남천 119입니다. 무엇을 도와드릴까요?"</b> 마무리: "소방차량 출동시켰습니다. 저는 상황실 ○○○입니다."</li>
         <li><span class="n">2.</span> 도입부 공통질문 — ① 위치(정확한 주소. 불가 시 주변 건물·상호·전신주·승강기 번호) ② 연소상황과 인명(불꽃·연기 규모, 구조대상자, 대피 여부, 출입문) ③ 신고자(대상물과의 관계, 연락처)</li>
-        <li><span class="n">3.</span> 예고지령은 접수와 동시에 시작한다. <b>신고자의 목소리만 듣고 장난·허위라고 단정하지 말고 우선 출동 조치한다.</b></li>
-        <li><span class="n">4.</span> 출동기준 3단계 — <b>긴급</b>(즉시 출동) · <b>잠재긴급</b>(방치 시 2차 사고, 출동) · <b>비긴급</b>(인명·재산 우려 없음 → 1차 유관기관·민간 통보, 2차 필요시 출동)</li>
+        <li><span class="n">3.</span> 화재 신고는 <b>위치가 확인되는 순간 출동시킨다</b>(예고지령). 질문은 출동시킨 뒤에도 계속할 수 있다. <b>신고자의 목소리만 듣고 장난·허위라고 단정해 출동을 보류하지 않는다</b> — 허위 여부는 출동 뒤 사후 조사(6번)가 가린다</li>
+        <li><span class="n">4.</span> 출동기준 3단계 — <b>긴급</b>(즉시 출동) · <b>잠재긴급</b>(방치 시 2차 사고, 출동) · <b>비긴급</b>(인명·재산 우려 없음 → 유관기관·민간 통보). <b>비긴급 분류는 화재 징후(불꽃·연기·열·타는 냄새) 진술이 없거나, 신고자 스스로 원인을 밝힌 생활 연기(조리 등)일 때만 가능하다.</b> 원인 불명의 냄새·연기는 화재 징후로 본다. 애매하면 위 단계로 올린다</li>
         <li><span class="n">5.</span> 출동 지령 후 안내: 진입로·대피유도·가스차단 고지. <b>"모르는 번호로 전화가 와도 꼭 받아주세요. 변화가 생기면 즉시 다시 119."</b></li>
         <li><span class="n">6.</span> 허위신고 과태료(소방기본법 56조): 1회 200만 · 2회 400만 · 3회 이상 500만 원. 판단은 <b>사후 조사</b>로 한다 — 접수 단계에서 가리지 않는다</li>
         <li><span class="n">7.</span> 미발생 사건 예고·협박성 신고 → 경찰 공동대응 요청. 2차 사고 우려 시 잠재긴급 분류 가능</li>
@@ -470,6 +470,10 @@ async function call1(){
   radio('차수호','1팀 현장 도착. 2층 주택 지붕 화염. 거주자 대피 확인. 방수 개시.');
   tick(6*60);
   radio('차수호','초진.');
+  await yun('규정은 하나야. 위치가 나오면 보낸다. 장난 같아도 보낸다.');
+  await wait(400);
+  await yun('대신 보내면 25분 동안 차고가 비어. 그 사이에 오는 전화는 규정이 안 받아. 네가 받아.');
+  await wait(400);
   await yun('첫 건 끝났어. 다음부턴 내가 안 봐.');
   tick(9*60);
   radio('차수호','완진. 잔화 정리 후 복귀.');
@@ -593,7 +597,7 @@ async function call2(){
     await type('caller','신고자','어 그래… (웃음) 고기 먹으러 올래?');
     sfx.hangup(); sys('L1 통화 종료 — 비긴급'); setLine('l1','');
   }
-  endCall({judge:{hold:'비긴급',go:'1팀 확인 출동',police:'경찰 이관'}[r.act], result:r.act==='go'?'헛걸음':'정상'});
+  endCall({judge:{hold:'비긴급 (4번 — 생활 연기 자인)',go:'1팀 확인 출동',police:'경찰 이관'}[r.act], result:r.act==='go'?'확인 출동 — 비화재':'정상'});
 }
 
 async function call3(){
@@ -613,9 +617,9 @@ async function call3(){
   ];
   const r=await converse('신고자', qs,
     a=>[
-      {id:'pump', k:'출동', t:'1팀 출동 지령 — 남천중 체육관', act:true, disabled:S.teams.pump.busy>0},
-      {id:'amb', k:'확인', t:'구급 1대만 확인 출동', act:true, disabled:S.teams.amb.busy>0},
-      {id:'hold', k:'보류', t:hung?'허위 판단 — 기록 후 종료':'허위 의심 — 보류 후 재접수 대기', act:true},
+      {id:'pump', k:'규정', t:'규정대로 1팀 출동 — 남천중 체육관 (3번 조항)', act:true, disabled:S.teams.pump.busy>0},
+      {id:'amb', k:'절충', t:'구급 1대만 확인 출동 — 3번은 펌프를 요구한다', act:true, disabled:S.teams.amb.busy>0},
+      {id:'hold', k:'위반', t:(hung?'허위로 판단, 기록만':'허위로 판단, 보류')+' — 3번 조항 위반, 내 책임', act:true},
     ],
     a=>hung?'상대가 끊었다. 판단은 남아 있다':(a.length?'질문 '+a.length+'회 · 매뉴얼 3·4':'위치 → 상황 → 인명'),
     async a=>{
@@ -641,7 +645,8 @@ async function call3(){
     me('허위 의심. 보류 기록.'); tick(6);
     await yun('…3번 조항, 알지. 네 판단이야. 받아.');
   }
-  endCall({judge:{pump:'1팀 출동',amb:'구급 확인 출동',hold:'보류'}[r.act], result:r.act==='hold'?'정답(규정 예외)':'헛걸음'});
+  endCall({judge:{pump:'1팀 출동 (규정)',amb:'구급 확인 출동',hold:'보류 (3번 위반)'}[r.act],
+    result:{pump:'규정 이행 — 허위였다, 과태료 의뢰',amb:'절충 — 비어 있던 구급 25분',hold:'적중 — 규정 밖 판단, 이번엔 맞았다'}[r.act]});
   drawTeams(); await wait(500);
 }
 
@@ -882,7 +887,7 @@ async function call5(){
     await type('caller','신고자','…그래요. 알았어요.');
     sfx.hangup(); sys('L1 통화 종료 — 비긴급'); setLine('l1','');
   }
-  endCall({judge:{listen:'2분 14초 들음',hold:'비긴급',go:'1팀 확인 출동'}[r.act], result:r.act==='go'?'헛걸음':'정상'});
+  endCall({judge:{listen:'2분 14초 들음',hold:'비긴급 (4번)',go:'1팀 확인 출동'}[r.act], result:r.act==='go'?'확인 출동 — 비화재':'정상'});
 }
 
 async function call6(){
